@@ -59,10 +59,10 @@ function RegisterForm() {
     // Fetch public pricing
     const fetchPricing = async () => {
       try {
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5050/api/v1';
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://betadaypos.onrender.com/api/v1';
         const cleanBaseUrl = baseUrl.endsWith('/api/v1') ? baseUrl : `${baseUrl}/api/v1`;
         
-        const res = await fetch(`${cleanBaseUrl}/pricing`);
+        const res = await fetch(`${cleanBaseUrl}/pricing`); 
         const data = await res.json();
         setAvailableModules(data.modules || []);
         setAvailablePlans(data.plans || []);
