@@ -1,4 +1,4 @@
-import apiClient from './api.service';
+import apiClient from '../lib/api';
 
 export const RecipeService = {
   getRecipe: async (productId: number) => {

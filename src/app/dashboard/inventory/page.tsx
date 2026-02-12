@@ -10,7 +10,7 @@ import {
   Edit, 
   Trash2, 
   Image as ImageIcon,
-  Loader2,
+  Loader2, 
   Package,
   Upload,
   X,
