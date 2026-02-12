@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Premium Dark Input Styles for Dashboard/Admin */
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="url"],
+select,
+textarea {
+  @apply bg-slate-900 border-slate-800 text-slate-100 placeholder:text-slate-600 focus:border-teal-500/50 focus:ring-teal-500/20 transition-all outline-none;
+}
+
+/* Ensure these styles don't conflict with legacy or specific utility-first designs 
+   if they are explicitly styled. We use lower specificity here. */
+.premium-input {
+  @apply w-full bg-slate-900 border border-slate-800 rounded-xl p-3 text-slate-100 placeholder:text-slate-600 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all outline-none shadow-inner;
+}
+
+.premium-label {
+  @apply block text-sm font-bold text-slate-400 mb-2 uppercase tracking-widest;
+}
