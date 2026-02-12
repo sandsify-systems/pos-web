@@ -12,6 +12,7 @@
     "@types/js-cookie": "^3.0.6",
     "axios": "^1.13.4",
     "clsx": "^2.1.1",
+    "date-fns": "^4.1.0",
     "framer-motion": "^12.31.2",
     "js-cookie": "^3.0.5",
     "lucide-react": "^0.563.0",
