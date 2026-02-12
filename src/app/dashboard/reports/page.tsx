@@ -118,9 +118,10 @@ export default function ReportsPage() {
     setAuditLoading(true);
     try {
       const logs = await SalesService.getActivities();
-      setActivities(logs);
+      setActivities(logs || []); // Ensure we always set an array, even if API returns null
     } catch (e) {
       toast.error('Failed to load audit logs');
+      setActivities([]); // Set empty array on error
     } finally {
       setAuditLoading(false);
     }
