@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
@@ -26,7 +26,7 @@ import {
 import { cn } from '@/lib/utils';
 import { AuthService } from '@/services/auth.service';
 
-export default function RegisterPage() {
+function RegisterForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   
@@ -705,5 +705,17 @@ export default function RegisterPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="w-16 h-16 border-4 border-teal-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <RegisterForm />
+    </Suspense>
   );
 }
