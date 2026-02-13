@@ -24,6 +24,8 @@ export interface Business {
   archive_frequency?: string;
   google_drive_linked?: boolean;
   active_modules?: string[];
+  table_management_enabled?: boolean;
+  save_to_draft_enabled?: boolean;
 }
 
 export interface AuthResponse {
