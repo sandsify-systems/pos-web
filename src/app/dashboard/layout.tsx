@@ -5,6 +5,7 @@ import { Sidebar } from '../../components/dashboard/Sidebar';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import { InactivityMonitor } from '../../components/dashboard/InactivityMonitor';
+import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Search, Bell, HelpCircle, ChevronDown, ChevronUp, LogOut } from 'lucide-react';
@@ -103,9 +104,13 @@ export default function DashboardLayout({
                   <Bell size={20} />
                   <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white" />
                 </button>
-                <button className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-colors">
+                <Link 
+                  href="/dashboard/how-it-works"
+                  className="p-2 text-slate-500 hover:bg-slate-50 rounded-lg transition-colors"
+                  title="How It Works"
+                >
                   <HelpCircle size={20} />
-                </button>
+                </Link>
                 <div className="h-8 w-px bg-slate-200 mx-2" />
               </>
             )}

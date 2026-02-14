@@ -45,6 +45,7 @@ const menuItems = [
   { icon: BarChart3, label: 'Reports', href: '/dashboard/reports', roles: ['owner', 'admin', 'manager'] },
   { icon: ShieldCheck, label: 'Compliance', href: '/dashboard/compliance', roles: ['owner', 'admin', 'manager'], requiresModule: 'AUTOMATED_COMPLIANCE' },
   { icon: Users, label: 'Staff', href: '/dashboard/staff', roles: ['owner', 'admin', 'manager'] },
+  { icon: BookOpen, label: 'How It Works', href: '/dashboard/how-it-works', roles: ['owner', 'admin', 'manager', 'cashier'] },
   { icon: Settings, label: 'Settings', href: '/dashboard/settings', roles: ['owner', 'admin', 'manager'] },
 ];
 

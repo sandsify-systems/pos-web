@@ -17,7 +17,9 @@ import {
   CreditCard,
   Plus,
   ChefHat,
-  Shield
+  Shield,
+  Lightbulb,
+  ChevronRight
 } from 'lucide-react';
 import { cn, formatCurrency } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
@@ -222,6 +224,34 @@ export default function DashboardPage() {
               </h3>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* How It Works Banner */}
+      {!permissions.isSuperAdmin && (
+        <div className="bg-gradient-to-r from-teal-600 to-teal-800 rounded-3xl p-8 text-white relative overflow-hidden group shadow-xl shadow-teal-600/10">
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-[10px] font-bold uppercase tracking-widest border border-white/20">
+                <Lightbulb size={12} className="text-amber-300" />
+                Quick Onboarding
+              </div>
+              <h2 className="text-2xl font-black tracking-tight">Need help setting up {business?.type?.replace('_', ' ') || 'your business'}?</h2>
+              <p className="text-teal-50/80 font-medium max-w-xl">
+                We've prepared simple, concise guides to help you master sales, stock management, and operational flow specific to your business model.
+              </p>
+            </div>
+            <Link 
+              href="/dashboard/how-it-works"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-white text-teal-700 font-black rounded-xl hover:bg-teal-50 transition-all active:scale-[0.98] shadow-lg shadow-black/10 group-hover:translate-x-1"
+            >
+              Learn How It Works
+              <ChevronRight size={18} />
+            </Link>
+          </div>
+          {/* Abstract background graphics */}
+          <div className="absolute right-0 top-0 w-64 h-64 bg-white/10 rounded-full translate-x-24 -translate-y-24 blur-3xl" />
+          <div className="absolute left-1/4 bottom-0 w-32 h-32 bg-teal-400/20 rounded-full translate-y-16 blur-2xl" />
         </div>
       )}
 
