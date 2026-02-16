@@ -349,7 +349,7 @@ function RegisterForm() {
                       formData.base_plan_type === 'TRIAL' ? "bg-white text-teal-600 shadow-sm" : "text-slate-500 hover:bg-slate-50"
                     )}
                    >
-                    Retail / Standard
+                    Growing Business
                    </button>
                    <button
                     type="button"
@@ -359,7 +359,7 @@ function RegisterForm() {
                       formData.base_plan_type === 'SERVICE_MONTHLY' ? "bg-white text-teal-600 shadow-sm" : "text-slate-500 hover:bg-slate-50"
                     )}
                    >
-                    Records Only Mode
+                    Starter / Basic
                    </button>
                 </div>
 
@@ -413,18 +413,18 @@ function RegisterForm() {
                       </div>
                   ) : (
                     <div className="flex-1 w-full p-12 text-center space-y-6 bg-slate-50 rounded-[3.5rem] border-2 border-dashed border-slate-200 animate-fade-in my-4">
-                       <div className="w-24 h-24 bg-white rounded-3xl flex items-center justify-center mx-auto text-teal-600 shadow-2xl shadow-teal-500/10 rotate-3">
+                       <div className="w-24 h-24 bg-teal-50 rounded-3xl flex items-center justify-center mx-auto text-teal-600 shadow-2xl shadow-teal-500/10 rotate-3">
                           <Store size={48} />
                        </div>
                        <div className="space-y-3 max-w-sm mx-auto">
-                          <h3 className="text-3xl font-black text-slate-900 tracking-tight leading-tight">Simplified Records Mode</h3>
+                          <h3 className="text-3xl font-black text-slate-900 tracking-tight leading-tight">Basic Sales Mode</h3>
                           <p className="text-slate-500 leading-relaxed font-medium">
-                            Pure sales tracking for high-velocity service stations. No inventory overhead. 
+                            Perfect for small shops & kiosks. Track sales, print receipts, and manage a small catalog.
                           </p>
                        </div>
-                       <div className="inline-flex items-center gap-3 px-8 py-4 bg-amber-100/50 text-amber-700 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] border border-amber-200">
+                       <div className="inline-flex items-center gap-3 px-8 py-4 bg-teal-100/50 text-teal-700 rounded-2xl text-[11px] font-black uppercase tracking-[0.2em] border border-teal-200">
                           <ShieldCheck size={16} />
-                          Retail Inventory Restricted
+                          Essential Features Only
                        </div>
                     </div>
                   )}

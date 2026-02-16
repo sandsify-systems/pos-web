@@ -33,6 +33,7 @@ export default function SubscriptionPage() {
   const [billingCycle, setBillingCycle] = useState<'MONTHLY' | 'QUARTERLY' | 'ANNUAL'>('MONTHLY');
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
   const [processing, setProcessing] = useState(false);
+  const [isBasicMode, setIsBasicMode] = useState(false);
 
   // Initialize from current subscription
   useEffect(() => {
@@ -44,6 +45,8 @@ export default function SubscriptionPage() {
        if (planType.includes('ANNUAL')) setBillingCycle('ANNUAL');
        else if (planType.includes('QUARTERLY')) setBillingCycle('QUARTERLY');
        else setBillingCycle('MONTHLY');
+       
+       if (planType.includes('SERVICE')) setIsBasicMode(true);
     }
   }, [activeModules, subscription]);
 
@@ -57,9 +60,9 @@ export default function SubscriptionPage() {
     });
   };
 
-  const { finalTotal, originalTotal, savings, discountPercent } = useMemo(() => {
-    const basePlanMonthly = plans.find(p => p.type === (business?.type === 'SERVICE' ? 'SERVICE_MONTHLY' : 'MONTHLY'));
-    const currentBasePlan = plans.find(p => p.type === (business?.type === 'SERVICE' ? `SERVICE_${billingCycle}` : billingCycle));
+  const { finalTotal, originalTotal, savings, discountPercent, currentBasePlan } = useMemo(() => {
+    const basePlanMonthly = plans.find(p => p.type === (isBasicMode ? 'SERVICE_MONTHLY' : 'MONTHLY'));
+    const currentBasePlan = plans.find(p => p.type === (isBasicMode ? `SERVICE_${billingCycle}` : billingCycle));
     
     const monthMultiplier = billingCycle === 'ANNUAL' ? 12 : billingCycle === 'QUARTERLY' ? 3 : 1;
     const cycleDiscount = billingCycle === 'ANNUAL' ? 0.85 : billingCycle === 'QUARTERLY' ? 0.9 : 1;
@@ -87,9 +90,10 @@ export default function SubscriptionPage() {
         finalTotal,
         originalTotal,
         savings,
-        discountPercent: Math.round((savings / originalTotal) * 100) || 0
+        discountPercent: Math.round((savings / originalTotal) * 100) || 0,
+        currentBasePlan
     };
-  }, [billingCycle, selectedModules, plans, availableModules, business]);
+  }, [billingCycle, selectedModules, plans, availableModules, isBasicMode]);
 
   const handlePay = () => {
     if (!user || !business) {
@@ -133,7 +137,7 @@ export default function SubscriptionPage() {
   const onPaymentSuccess = async (response: any) => {
     try {
       toast.loading('Activating your plan...', { id: 'activation' });
-      const planType = business?.type === 'SERVICE' ? `SERVICE_${billingCycle}` : billingCycle;
+      const planType = isBasicMode ? `SERVICE_${billingCycle}` : billingCycle;
       
       await processSubscription(
         planType, 
@@ -215,14 +219,41 @@ export default function SubscriptionPage() {
             <section className="space-y-6">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-sm shadow-lg">1</div>
-                    <h2 className="text-xl font-black text-slate-900 tracking-tight lowercase">Choose billing cycle</h2>
+                    <h2 className="text-xl font-black text-slate-900 tracking-tight lowercase">Choose your plan</h2>
+                </div>
+
+                {/* Plan Toggle */}
+                <div className="bg-slate-100 p-1.5 rounded-2xl flex relative mb-8">
+                   <button
+                    type="button"
+                    onClick={() => setIsBasicMode(false)}
+                    className={cn(
+                      "flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all relative z-10",
+                      !isBasicMode ? "bg-white text-teal-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                    )}
+                   >
+                    Growing Business
+                   </button>
+                   <button
+                    type="button"
+                    onClick={() => {
+                        setIsBasicMode(true);
+                        setSelectedModules([]); // Clear modules
+                    }}
+                    className={cn(
+                      "flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all relative z-10",
+                      isBasicMode ? "bg-white text-teal-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                    )}
+                   >
+                    Starter / Basic
+                   </button>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {[
                     { id: 'MONTHLY', label: 'Monthly', discount: 'Normal Rate', icon: Calendar },
-                    { id: 'QUARTERLY', label: 'Quarterly', discount: 'Save 10%', icon: Package },
-                    { id: 'ANNUAL', label: 'Annual', discount: 'Save 15%', icon: Sparkles }
+                    { id: 'QUARTERLY', label: 'Quarterly', discount: isBasicMode ? '+1 User Bonus' : 'Save 10%', icon: Package },
+                    { id: 'ANNUAL', label: 'Annual', discount: isBasicMode ? '+3 Users Bonus' : 'Save 15%', icon: Sparkles }
                   ].map((cycle) => (
                     <div 
                       key={cycle.id}
@@ -249,10 +280,27 @@ export default function SubscriptionPage() {
             <section className="space-y-6 pb-12">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center font-black text-sm shadow-lg">2</div>
-                    <h2 className="text-xl font-black text-slate-900 tracking-tight lowercase">Customize Features</h2>
+                    <h2 className="text-xl font-black text-slate-900 tracking-tight lowercase">
+                        {isBasicMode ? 'Included Features' : 'Customize Features'}
+                    </h2>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {isBasicMode ? (
+                    <div className="p-8 rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50 flex flex-col items-center text-center">
+                        <div className="w-16 h-16 rounded-full bg-teal-100/50 flex items-center justify-center mb-4 text-teal-600">
+                            <ShieldCheck size={32} />
+                        </div>
+                        <h3 className="text-lg font-black text-slate-900 mb-2">Basic Sales Mode</h3>
+                        <p className="text-sm text-slate-500 max-w-md mx-auto mb-6">
+                            Perfect for small shops & kiosks. Includes sales tracking, receipt printing, and a catalog of up to 25 items.
+                        </p>
+                        <div className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-slate-200 shadow-sm">
+                            <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
+                            <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Essential Features Only</span>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {availableModules.map((mod) => {
                          const isSelected = selectedModules.includes(mod.type);
                          return (
@@ -285,6 +333,7 @@ export default function SubscriptionPage() {
                          );
                     })}
                 </div>
+                )}
             </section>
         </div>
 
@@ -301,10 +350,10 @@ export default function SubscriptionPage() {
                  <div className="flex justify-between items-start">
                     <div className="space-y-1">
                         <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Base Terminal</p>
-                        <p className="text-sm font-bold text-slate-800">{billingCycle === 'ANNUAL' ? 'Professional Annual' : billingCycle === 'QUARTERLY' ? 'Business Quarterly' : 'Essential Monthly'}</p>
+                        <p className="text-sm font-bold text-slate-800">{currentBasePlan?.name || 'Base Plan'}</p>
                     </div>
                     <p className="text-sm font-black text-slate-900">
-                        {formatCurrency(plans.find(p => p.type === (business?.type === 'SERVICE' ? `SERVICE_${billingCycle}` : billingCycle))?.price || 0)}
+                        {formatCurrency(plans.find(p => p.type === (isBasicMode ? `SERVICE_${billingCycle}` : billingCycle))?.price || 0)}
                     </p>
                  </div>
 
@@ -388,8 +437,46 @@ export default function SubscriptionPage() {
             <div className="mt-8 p-6 bg-gradient-to-br from-indigo-900 to-slate-900 rounded-[2.5rem] text-white relative overflow-hidden group">
                  <Zap className="absolute right-[-20%] bottom-[-20%] w-48 h-48 text-white/5 group-hover:scale-110 transition-transform duration-700" />
                  <div className="relative z-10 space-y-4">
-                    <h4 className="font-black text-lg tracking-tight">Enterprise Scaling</h4>
-                    <p className="text-[11px] text-slate-400 font-medium leading-relaxed">Upgrade anytime. Your new features are activated instantly across all your business terminals.</p>
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm">
+                            <Users size={16} className="text-teal-400" />
+                        </div>
+                        <h4 className="font-black text-lg tracking-tight">Plan Benefits</h4>
+                    </div>
+                    
+                    <div className="space-y-3">
+                        <div className="flex items-start gap-3">
+                            <div className="w-1.5 h-1.5 rounded-full bg-teal-400 mt-1.5" />
+                            <div>
+                                <p className="text-xs font-bold text-white">
+                                    {currentBasePlan ? (currentBasePlan as any).UserLimit || 1 : 1} User Accounts
+                                </p>
+                                <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
+                                    {isBasicMode && billingCycle === 'MONTHLY' ? 'Upgrade to Quarterly for +1 User' : 
+                                     isBasicMode && billingCycle === 'QUARTERLY' ? 'Includes 1 Bonus User' :
+                                     isBasicMode && billingCycle === 'ANNUAL' ? 'Includes 3 Bonus Users' : 'Standard Access'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                            <div className="w-1.5 h-1.5 rounded-full bg-teal-400 mt-1.5" />
+                            <div>
+                                <p className="text-xs font-bold text-white">
+                                    {isBasicMode ? '25 Product Limit' : 'Unlimited Products'}
+                                </p>
+                                <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
+                                    {isBasicMode ? 'Perfect for kiosks & small shops' : 'Full inventory management'}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-white/10 mt-4">
+                        <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
+                            Upgrade anytime. Your new features are activated instantly across all your business terminals.
+                        </p>
+                    </div>
                  </div>
             </div>
         </div>
