@@ -171,11 +171,44 @@ function RegisterForm() {
   };
 
   const calculateBillingTotal = () => {
-    const monthlyTotal = calculateTotal();
+    let total = 0;
     const cycle = formData.billing_cycle;
     const multiplier = cycle === 'ANNUAL' ? 12 : cycle === 'QUARTERLY' ? 3 : 1;
     const discount = cycle === 'ANNUAL' ? 0.85 : cycle === 'QUARTERLY' ? 0.9 : 1;
-    return monthlyTotal * multiplier * discount;
+
+    // 1. Identify and add Base Plan Price for the specific cycle
+    let targetPlanType = formData.base_plan_type;
+    
+    // If it's a TRIAL or MONTHLY focus, determine the cycle-specific plan type
+    if (targetPlanType === 'TRIAL' || targetPlanType === 'MONTHLY') {
+      if (cycle === 'QUARTERLY') targetPlanType = 'QUARTERLY';
+      else if (cycle === 'ANNUAL') targetPlanType = 'ANNUAL';
+      else targetPlanType = 'MONTHLY';
+    } else if (targetPlanType === 'SERVICE_MONTHLY' || targetPlanType.includes('SERVICE')) {
+      if (cycle === 'QUARTERLY') targetPlanType = 'SERVICE_QUARTERLY';
+      else if (cycle === 'ANNUAL') targetPlanType = 'SERVICE_ANNUAL';
+      else targetPlanType = 'SERVICE_MONTHLY';
+    }
+
+    const plan = availablePlans.find(p => p.type === targetPlanType);
+    if (plan) {
+      total += plan.price;
+    } else {
+      // Fallback to monthly * multiplier * discount if specific plan not found
+      const baseMonthlyType = (formData.base_plan_type === 'SERVICE_MONTHLY' || formData.base_plan_type.includes('SERVICE')) 
+        ? 'SERVICE_MONTHLY' 
+        : 'MONTHLY';
+      const basePlan = availablePlans.find(p => p.type === baseMonthlyType);
+      if (basePlan) total += (basePlan.price * multiplier * discount);
+    }
+
+    // 2. Add Modules with standard discount math
+    formData.selected_modules.forEach(modType => {
+      const mod = availableModules.find(m => m.type === modType);
+      if (mod) total += (mod.price * multiplier * discount);
+    });
+
+    return Math.round(total);
   };
 
   return (
