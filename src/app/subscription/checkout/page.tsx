@@ -18,7 +18,8 @@ import {
   Globe,
   Sparkles,
   AlertCircle,
-  Calendar
+  Calendar,
+  Info
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import Script from 'next/script';
@@ -400,6 +401,17 @@ export default function CheckoutPage() {
                         256-bit SSL Secure
                     </div>
                      <img src="https://paystack.com/assets/img/login/paystack-logo.png" alt="Paystack" className="h-4 opacity-20 grayscale" />
+                </div>
+
+                {/* Software License Disclaimer */}
+                <div className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex items-start gap-3 mt-2">
+                  <Info size={16} className="text-slate-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-500">Software License Only</p>
+                    <p className="text-[10px] text-slate-400 mt-1 leading-relaxed">
+                      Prices are for the BETADAY software license only and <strong>do not include hardware costs</strong>. Please contact your installer for hardware pricing.
+                    </p>
+                  </div>
                 </div>
            </div>
         </div>

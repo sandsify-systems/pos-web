@@ -21,7 +21,8 @@ import {
   ChevronDown,
   ChevronUp,
   Package,
-  Check
+  Check,
+  Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AuthService } from '@/services/auth.service';
@@ -49,6 +50,7 @@ function RegisterForm() {
     use_sample_data: true,
     base_plan_type: 'TRIAL',
     skip_trial: false,
+    billing_cycle: 'MONTHLY' as 'MONTHLY' | 'QUARTERLY' | 'ANNUAL',
   });
 
   const [availableModules, setAvailableModules] = useState<any[]>([]);
@@ -131,6 +133,7 @@ function RegisterForm() {
         modules: formData.selected_modules,
         use_sample_data: formData.use_sample_data,
         skip_trial: formData.skip_trial,
+        billing_cycle: formData.skip_trial ? formData.billing_cycle : undefined,
         referral_token: referralToken || undefined
       });
       
@@ -165,6 +168,14 @@ function RegisterForm() {
       if (mod) total += mod.price;
     });
     return total;
+  };
+
+  const calculateBillingTotal = () => {
+    const monthlyTotal = calculateTotal();
+    const cycle = formData.billing_cycle;
+    const multiplier = cycle === 'ANNUAL' ? 12 : cycle === 'QUARTERLY' ? 3 : 1;
+    const discount = cycle === 'ANNUAL' ? 0.85 : cycle === 'QUARTERLY' ? 0.9 : 1;
+    return monthlyTotal * multiplier * discount;
   };
 
   return (
@@ -438,7 +449,7 @@ function RegisterForm() {
                    <div className="flex items-center justify-center gap-4 mb-8 relative z-10 bg-white/5 p-1 rounded-2xl w-fit mx-auto md:ml-0">
                       <button 
                         type="button"
-                        onClick={() => setFormData({...formData, skip_trial: false})}
+                        onClick={() => setFormData({...formData, skip_trial: false, billing_cycle: 'MONTHLY'})}
                         className={cn("px-6 py-2 rounded-xl text-[10px] font-black transition-all", !formData.skip_trial ? "bg-teal-600 text-white shadow-lg" : "text-slate-400 hover:text-white")}
                       >
                          START 14-DAY TRIAL
@@ -452,15 +463,58 @@ function RegisterForm() {
                       </button>
                    </div>
 
+                   {/* Billing Cycle Selector - shown only when Pay Immediately is selected */}
+                   {formData.skip_trial && (
+                     <div className="mb-8 relative z-10">
+                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 text-center md:text-left">Select Billing Cycle</p>
+                       <div className="grid grid-cols-3 gap-3">
+                         {[
+                           { id: 'MONTHLY' as const, label: 'Monthly', price: calculateTotal(), discount: null },
+                           { id: 'QUARTERLY' as const, label: 'Quarterly', price: calculateTotal() * 3 * 0.9, discount: '10% OFF' },
+                           { id: 'ANNUAL' as const, label: 'Annual', price: calculateTotal() * 12 * 0.85, discount: '15% OFF' },
+                         ].map((cycle) => (
+                           <div
+                             key={cycle.id}
+                             onClick={() => setFormData({...formData, billing_cycle: cycle.id})}
+                             className={cn(
+                               "p-4 rounded-2xl border-2 cursor-pointer transition-all text-center relative",
+                               formData.billing_cycle === cycle.id
+                                 ? "border-amber-500 bg-amber-500/10 shadow-lg shadow-amber-500/10"
+                                 : "border-white/10 bg-white/5 hover:bg-white/10"
+                             )}
+                           >
+                             {/* Tick indicator */}
+                             <div className={cn(
+                               "absolute top-3 right-3 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all",
+                               formData.billing_cycle === cycle.id ? "bg-amber-500 border-amber-500" : "border-white/30 bg-transparent"
+                             )}>
+                               {formData.billing_cycle === cycle.id && <Check size={12} className="text-white" strokeWidth={3} />}
+                             </div>
+                             <p className={cn("text-[10px] font-black uppercase mb-2 tracking-widest", formData.billing_cycle === cycle.id ? "text-amber-400" : "text-slate-500")}>{cycle.label}</p>
+                             <p className="text-lg font-black tracking-tight text-white">₦{cycle.price.toLocaleString()}</p>
+                             {cycle.discount && (
+                               <p className="text-[9px] text-teal-400 font-black mt-2 bg-teal-400/10 py-1 rounded-lg">{cycle.discount}</p>
+                             )}
+                           </div>
+                         ))}
+                       </div>
+                     </div>
+                   )}
+
                    <div className="flex flex-col xl:flex-row justify-between items-center gap-10 relative z-10">
                       <div className="text-center md:text-left flex-1">
                          <div className="flex items-center gap-2 mb-2 justify-center md:justify-start">
                             <span className={cn("w-2 h-2 rounded-full animate-pulse", formData.skip_trial ? "bg-amber-400" : "bg-teal-400")} />
                             <p className={cn("text-[10px] font-black uppercase tracking-[0.2em]", formData.skip_trial ? "text-amber-400" : "text-teal-400")}>
-                              {formData.skip_trial ? 'Immediate Settlement Due' : 'Total Post-Trial Billing'}
+                              {formData.skip_trial ? `${formData.billing_cycle} Settlement Due` : 'Total Post-Trial Billing'}
                             </p>
                          </div>
-                         <h3 className="text-5xl font-black tracking-tighter">₦{calculateTotal().toLocaleString()} <span className="text-lg text-slate-500 font-bold ml-1">/ mo</span></h3>
+                         <h3 className="text-5xl font-black tracking-tighter">
+                           {formData.skip_trial 
+                             ? <>₦{calculateBillingTotal().toLocaleString()} <span className="text-lg text-slate-500 font-bold ml-1">/ {formData.billing_cycle === 'ANNUAL' ? 'yr' : formData.billing_cycle === 'QUARTERLY' ? 'qtr' : 'mo'}</span></>
+                             : <>₦{calculateTotal().toLocaleString()} <span className="text-lg text-slate-500 font-bold ml-1">/ mo</span></>
+                           }
+                         </h3>
                          <p className="text-[10px] text-slate-400 mt-3 font-bold uppercase tracking-widest leading-loose">
                            {formData.skip_trial 
                             ? "Commit now and get your specialized business keys instantly." 
@@ -469,18 +523,21 @@ function RegisterForm() {
                          </p>
                       </div>
 
-                      <div className="flex flex-wrap justify-center gap-4">
-                         <div className="bg-white/5 border border-white/10 p-5 rounded-[2rem] text-center min-w-[140px] hover:bg-white/10 transition-all cursor-help group/card">
-                            <p className="text-[10px] font-black text-slate-500 uppercase mb-2 tracking-widest">Quarterly</p>
-                            <p className="text-lg font-black tracking-tight">₦{(calculateTotal() * 3 * 0.9).toLocaleString()}</p>
-                            <p className="text-[9px] text-teal-400 font-black mt-2 bg-teal-400/10 py-1 rounded-lg">SAVE 10%</p>
-                         </div>
-                         <div className="bg-white/5 border border-white/10 p-5 rounded-[2rem] text-center min-w-[140px] hover:bg-white/10 transition-all cursor-help group/card">
-                            <p className="text-[10px] font-black text-slate-500 uppercase mb-2 tracking-widest">Annual</p>
-                            <p className="text-lg font-black tracking-tight">₦{(calculateTotal() * 12 * 0.85).toLocaleString()}</p>
-                            <p className="text-[9px] text-teal-400 font-black mt-2 bg-teal-400/10 py-1 rounded-lg">SAVE 15%</p>
-                         </div>
-                      </div>
+                      {/* Show pricing comparison only when NOT in pay immediately mode */}
+                      {!formData.skip_trial && (
+                        <div className="flex flex-wrap justify-center gap-4">
+                           <div className="bg-white/5 border border-white/10 p-5 rounded-[2rem] text-center min-w-[140px] hover:bg-white/10 transition-all cursor-help group/card">
+                              <p className="text-[10px] font-black text-slate-500 uppercase mb-2 tracking-widest">Quarterly</p>
+                              <p className="text-lg font-black tracking-tight">₦{(calculateTotal() * 3 * 0.9).toLocaleString()}</p>
+                              <p className="text-[9px] text-teal-400 font-black mt-2 bg-teal-400/10 py-1 rounded-lg">SAVE 10%</p>
+                           </div>
+                           <div className="bg-white/5 border border-white/10 p-5 rounded-[2rem] text-center min-w-[140px] hover:bg-white/10 transition-all cursor-help group/card">
+                              <p className="text-[10px] font-black text-slate-500 uppercase mb-2 tracking-widest">Annual</p>
+                              <p className="text-lg font-black tracking-tight">₦{(calculateTotal() * 12 * 0.85).toLocaleString()}</p>
+                              <p className="text-[9px] text-teal-400 font-black mt-2 bg-teal-400/10 py-1 rounded-lg">SAVE 15%</p>
+                           </div>
+                        </div>
+                      )}
 
                       <div className="text-center md:text-right flex flex-col items-center md:items-end gap-3 xl:border-l xl:border-white/10 xl:pl-10">
                          <div className={cn("px-6 py-3 rounded-2xl text-[10px] font-black shadow-xl uppercase tracking-widest", formData.skip_trial ? "bg-amber-600 text-white" : "bg-teal-600 text-white")}>
@@ -495,10 +552,23 @@ function RegisterForm() {
                    </div>
                 </div>
 
-                <div className="p-4 bg-teal-600 text-white rounded-[2rem] text-center">
-                  <p className="text-xs font-black uppercase tracking-widest opacity-80">Trial Experience</p>
-                  <p className="text-sm font-medium mt-1">All selected modules will be free for the first 14 days!</p>
+                {/* Software License Disclaimer */}
+                <div className="p-4 bg-slate-100 border border-slate-200 rounded-[2rem] flex items-start gap-3">
+                  <Info size={18} className="text-slate-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-slate-600">Software License Only</p>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                      All prices shown are for the BETADAY software license only and <strong>do not include the cost of hardware</strong> (POS terminals, printers, barcode scanners, etc.). Hardware pricing varies by configuration — please contact your installer or sales representative for a quote.
+                    </p>
+                  </div>
                 </div>
+
+                {!formData.skip_trial && (
+                  <div className="p-4 bg-teal-600 text-white rounded-[2rem] text-center">
+                    <p className="text-xs font-black uppercase tracking-widest opacity-80">Trial Experience</p>
+                    <p className="text-sm font-medium mt-1">All selected modules will be free for the first 14 days!</p>
+                  </div>
+                )}
 
                 <div className="flex gap-4">
                     <button
