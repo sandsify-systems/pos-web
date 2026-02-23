@@ -27,6 +27,7 @@ import { useSubscription } from '../../contexts/SubscriptionContext';
 import { ReportService, type DailyReport } from '../../services/report.service';
 import { RolePermissions, UserRole } from '../../constants/roles';
 import Link from 'next/link';
+import TrialChecklist from '../../components/dashboard/TrialChecklist';
 
 export default function DashboardPage() {
   const { business, user } = useAuth();
@@ -226,6 +227,9 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {/* Trial Checklist (Guided Setup) */}
+      <TrialChecklist />
 
       {/* How It Works Banner */}
       {!permissions.isSuperAdmin && (

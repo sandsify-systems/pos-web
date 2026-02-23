@@ -17,7 +17,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { isAuthenticated, isLoading, user, logout } = useAuth();
-  const { isSubscribed, loading: subLoading } = useSubscription();
+  const { isSubscribed, loading: subLoading, subscription } = useSubscription();
   const router = useRouter();
   const pathname = usePathname();
   const [isHeaderVisible, setIsHeaderVisible] = useState(true);
@@ -28,9 +28,14 @@ export default function DashboardLayout({
     if (!isLoading && !isAuthenticated) {
       router.push('/auth/login');
     } else if (!isLoading && !subLoading && isAuthenticated && !isSubscribed && user?.role !== 'super_admin') {
-      router.push('/subscription/checkout');
+      // If it's a trial and it's expired/pending payment, go to locked screen
+      if (subscription?.plan_type === 'TRIAL') {
+        router.push('/locked');
+      } else {
+        router.push('/subscription/checkout');
+      }
     }
-  }, [isLoading, subLoading, isAuthenticated, isSubscribed, router, user?.role]);
+  }, [isLoading, subLoading, isAuthenticated, isSubscribed, router, user?.role, subscription?.plan_type]);
 
   // Default to collapsed header on fullscreen pages
   useEffect(() => {

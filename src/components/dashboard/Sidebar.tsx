@@ -52,7 +52,7 @@ const menuItems = [
 export function Sidebar() {
   const pathname = usePathname();
   const { business, logout, user } = useAuth();
-  const { hasModule } = useSubscription();
+  const { hasModule, subscription, daysRemaining } = useSubscription();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
@@ -99,6 +99,30 @@ export function Sidebar() {
             </div>
           )}
         </div>
+
+        {/* Trial Countdown Nudge */}
+        {!isCollapsed && subscription?.plan_type === 'TRIAL' && (
+          <div className="px-5 mt-2 animate-in fade-in slide-in-from-left-4 duration-500">
+            <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 space-y-3 shadow-sm shadow-amber-900/5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-amber-800 uppercase tracking-widest italic">Trial Status</span>
+                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded-md">{daysRemaining} days left</span>
+              </div>
+              <div className="w-full bg-amber-200 h-1 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-amber-600 transition-all duration-1000 ease-out" 
+                  style={{ width: `${(daysRemaining / 14) * 100}%` }}
+                />
+              </div>
+              <Link 
+                href="/subscription/checkout"
+                className="block text-center py-2 bg-white border border-amber-200 rounded-xl text-[10px] font-black text-amber-800 hover:bg-amber-100 transition-colors uppercase tracking-widest shadow-sm"
+              >
+                Upgrade Plan
+              </Link>
+            </div>
+          </div>
+        )}
 
         {/* Toggle Button (Desktop only) */}
         <button 

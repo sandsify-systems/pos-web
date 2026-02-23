@@ -134,4 +134,24 @@ export const SubscriptionService = {
     const response = await apiClient.delete(`/admin/training-resources/${id}`);
     return response.data;
   },
+
+  getTrialChecklist: async (): Promise<TrialChecklist> => {
+    const response = await apiClient.get('/trial-checklist');
+    return response.data;
+  },
 };
+
+export interface TrialChecklist {
+  id: number;
+  business_id: number;
+  business_info_completed: boolean;
+  device_connected: boolean;
+  products_added_count: number;
+  payment_configured: boolean;
+  receipt_tested: boolean;
+  cashier_created: boolean;
+  login_tested: boolean;
+  first_sale_recorded: boolean;
+  report_viewed: boolean;
+}
+
