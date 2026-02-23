@@ -170,16 +170,13 @@ function RegisterForm() {
     return total;
   };
 
-  const calculateBillingTotal = () => {
+  const calculateTotalForCycle = (cycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL') => {
     let total = 0;
-    const cycle = formData.billing_cycle;
     const multiplier = cycle === 'ANNUAL' ? 12 : cycle === 'QUARTERLY' ? 3 : 1;
     const discount = cycle === 'ANNUAL' ? 0.85 : cycle === 'QUARTERLY' ? 0.9 : 1;
 
-    // 1. Identify and add Base Plan Price for the specific cycle
+    // 1. Base Plan Price
     let targetPlanType = formData.base_plan_type;
-    
-    // If it's a TRIAL or MONTHLY focus, determine the cycle-specific plan type
     if (targetPlanType === 'TRIAL' || targetPlanType === 'MONTHLY') {
       if (cycle === 'QUARTERLY') targetPlanType = 'QUARTERLY';
       else if (cycle === 'ANNUAL') targetPlanType = 'ANNUAL';
@@ -194,7 +191,6 @@ function RegisterForm() {
     if (plan) {
       total += plan.price;
     } else {
-      // Fallback to monthly * multiplier * discount if specific plan not found
       const baseMonthlyType = (formData.base_plan_type === 'SERVICE_MONTHLY' || formData.base_plan_type.includes('SERVICE')) 
         ? 'SERVICE_MONTHLY' 
         : 'MONTHLY';
@@ -202,13 +198,26 @@ function RegisterForm() {
       if (basePlan) total += (basePlan.price * multiplier * discount);
     }
 
-    // 2. Add Modules with standard discount math
+    // 2. Modules
     formData.selected_modules.forEach(modType => {
       const mod = availableModules.find(m => m.type === modType);
       if (mod) total += (mod.price * multiplier * discount);
     });
 
     return Math.round(total);
+  };
+
+  const calculateBillingTotal = () => {
+    return calculateTotalForCycle(formData.billing_cycle);
+  };
+
+  const calculateSavings = (cycle: 'QUARTERLY' | 'ANNUAL') => {
+    const monthlyTotal = calculateTotalForCycle('MONTHLY');
+    const multiplier = cycle === 'ANNUAL' ? 12 : cycle === 'QUARTERLY' ? 3 : 1;
+    const original = monthlyTotal * multiplier;
+    const current = calculateTotalForCycle(cycle);
+    if (original === 0) return cycle === 'ANNUAL' ? 15 : 10;
+    return Math.round(((original - current) / original) * 100);
   };
 
   return (
@@ -502,9 +511,9 @@ function RegisterForm() {
                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4 text-center md:text-left">Select Billing Cycle</p>
                        <div className="grid grid-cols-3 gap-3">
                          {[
-                           { id: 'MONTHLY' as const, label: 'Monthly', price: calculateTotal(), discount: null },
-                           { id: 'QUARTERLY' as const, label: 'Quarterly', price: calculateTotal() * 3 * 0.9, discount: '10% OFF' },
-                           { id: 'ANNUAL' as const, label: 'Annual', price: calculateTotal() * 12 * 0.85, discount: '15% OFF' },
+                           { id: 'MONTHLY' as const, label: 'Monthly', price: calculateTotalForCycle('MONTHLY'), discount: null },
+                           { id: 'QUARTERLY' as const, label: 'Quarterly', price: calculateTotalForCycle('QUARTERLY'), discount: `${calculateSavings('QUARTERLY')}% OFF` },
+                           { id: 'ANNUAL' as const, label: 'Annual', price: calculateTotalForCycle('ANNUAL'), discount: `${calculateSavings('ANNUAL')}% OFF` },
                          ].map((cycle) => (
                            <div
                              key={cycle.id}
@@ -564,20 +573,20 @@ function RegisterForm() {
                       </div>
 
                       {/* Show pricing comparison only when NOT in pay immediately mode */}
-                      {!formData.skip_trial && (
-                        <div className="flex flex-wrap justify-center gap-4">
-                           <div className="bg-white/5 border border-white/10 p-5 rounded-[2rem] text-center min-w-[140px] hover:bg-white/10 transition-all cursor-help group/card">
-                              <p className="text-[10px] font-black text-slate-500 uppercase mb-2 tracking-widest">Quarterly</p>
-                              <p className="text-lg font-black tracking-tight">₦{(calculateTotal() * 3 * 0.9).toLocaleString()}</p>
-                              <p className="text-[9px] text-teal-400 font-black mt-2 bg-teal-400/10 py-1 rounded-lg">SAVE 10%</p>
-                           </div>
-                           <div className="bg-white/5 border border-white/10 p-5 rounded-[2rem] text-center min-w-[140px] hover:bg-white/10 transition-all cursor-help group/card">
-                              <p className="text-[10px] font-black text-slate-500 uppercase mb-2 tracking-widest">Annual</p>
-                              <p className="text-lg font-black tracking-tight">₦{(calculateTotal() * 12 * 0.85).toLocaleString()}</p>
-                              <p className="text-[9px] text-teal-400 font-black mt-2 bg-teal-400/10 py-1 rounded-lg">SAVE 15%</p>
-                           </div>
-                        </div>
-                      )}
+                       {!formData.skip_trial && (
+                         <div className="flex flex-wrap justify-center gap-4">
+                            <div className="bg-white/5 border border-white/10 p-5 rounded-[2rem] text-center min-w-[140px] hover:bg-white/10 transition-all cursor-help group/card">
+                               <p className="text-[10px] font-black text-slate-500 uppercase mb-2 tracking-widest">Quarterly</p>
+                               <p className="text-lg font-black tracking-tight">₦{calculateTotalForCycle('QUARTERLY').toLocaleString()}</p>
+                               <p className="text-[9px] text-teal-400 font-black mt-2 bg-teal-400/10 py-1 rounded-lg">SAVE {calculateSavings('QUARTERLY')}%</p>
+                            </div>
+                            <div className="bg-white/5 border border-white/10 p-5 rounded-[2rem] text-center min-w-[140px] hover:bg-white/10 transition-all cursor-help group/card">
+                               <p className="text-[10px] font-black text-slate-500 uppercase mb-2 tracking-widest">Annual</p>
+                               <p className="text-lg font-black tracking-tight">₦{calculateTotalForCycle('ANNUAL').toLocaleString()}</p>
+                               <p className="text-[9px] text-teal-400 font-black mt-2 bg-teal-400/10 py-1 rounded-lg">SAVE {calculateSavings('ANNUAL')}%</p>
+                            </div>
+                         </div>
+                       )}
 
                       <div className="text-center md:text-right flex flex-col items-center md:items-end gap-3 xl:border-l xl:border-white/10 xl:pl-10">
                          <div className={cn("px-6 py-3 rounded-2xl text-[10px] font-black shadow-xl uppercase tracking-widest", formData.skip_trial ? "bg-amber-600 text-white" : "bg-teal-600 text-white")}>
