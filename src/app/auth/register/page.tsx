@@ -27,6 +27,61 @@ import {
 import { cn } from '@/lib/utils';
 import { AuthService } from '@/services/auth.service';
 
+const BUSINESS_TYPE_MODULES: Record<string, { recommended: string[], visible: string[] }> = {
+  RESTAURANT: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE', 'DIGITAL_MENU_QR'],
+    visible: ['RECIPE_MANAGEMENT', 'KITCHEN_DISPLAY'],
+  },
+  BAR: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE', 'DIGITAL_MENU_QR', 'TABLE_MANAGEMENT', 'SAVE_DRAFTS'],
+    visible: ['RECIPE_MANAGEMENT'],
+  },
+  LOUNGE: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE', 'DIGITAL_MENU_QR', 'TABLE_MANAGEMENT', 'SAVE_DRAFTS'],
+    visible: ['RECIPE_MANAGEMENT', 'KITCHEN_DISPLAY'],
+  },
+  SUPERMARKET: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE'],
+    visible: ['WHATSAPP_ALERTS'],
+  },
+  RETAIL: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE'],
+    visible: ['WHATSAPP_ALERTS'],
+  },
+  BOUTIQUE: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE'],
+    visible: ['WHATSAPP_ALERTS'],
+  },
+  PHARMACY: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE'],
+    visible: ['WHATSAPP_ALERTS'],
+  },
+  CLINIC: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE'],
+    visible: ['WHATSAPP_ALERTS'],
+  },
+  BAKERY: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE', 'RECIPE_MANAGEMENT'],
+    visible: ['KITCHEN_DISPLAY'],
+  },
+  HOTEL: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE', 'TABLE_MANAGEMENT', 'SAVE_DRAFTS', 'DIGITAL_MENU_QR'],
+    visible: ['KITCHEN_DISPLAY', 'RECIPE_MANAGEMENT'],
+  },
+  FUEL_STATION: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE', 'BULK_STOCK_MANAGEMENT'],
+    visible: ['WHATSAPP_ALERTS'],
+  },
+  LPG_STATION: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE', 'BULK_STOCK_MANAGEMENT'],
+    visible: ['WHATSAPP_ALERTS'],
+  },
+  OTHER: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE'],
+    visible: ['WHATSAPP_ALERTS', 'SAVE_DRAFTS'],
+  }
+};
+
 function RegisterForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -82,6 +137,16 @@ function RegisterForm() {
       toast.success('Referral code applied!');
     }
   }, [searchParams]);
+
+  // Auto-select modules based on business type
+  useEffect(() => {
+    if (formData.base_plan_type === 'TRIAL') {
+      const config = BUSINESS_TYPE_MODULES[formData.business_type] || BUSINESS_TYPE_MODULES.OTHER;
+      setFormData(prev => ({ ...prev, selected_modules: config.recommended }));
+    } else {
+      setFormData(prev => ({ ...prev, selected_modules: [] }));
+    }
+  }, [formData.business_type, formData.base_plan_type]);
 
   const nextStep = () => {
     if (step === 1 && (!formData.business_name || !formData.business_type)) {
@@ -424,7 +489,12 @@ function RegisterForm() {
                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Select Premium Features</label>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                           {availableModules.map((mod) => {
+                           {availableModules.filter((mod: any) => {
+                              const config = BUSINESS_TYPE_MODULES[formData.business_type] || BUSINESS_TYPE_MODULES.OTHER;
+                              return config.recommended.includes(mod.type) || config.visible.includes(mod.type);
+                           }).map((mod) => {
+                             const config = BUSINESS_TYPE_MODULES[formData.business_type] || BUSINESS_TYPE_MODULES.OTHER;
+                             const isRecommended = config.recommended.includes(mod.type);
                              const isSelected = formData.selected_modules.includes(mod.type);
                              return (
                                <div 
@@ -438,10 +508,15 @@ function RegisterForm() {
                                    }
                                  }}
                                  className={cn(
-                                   "p-5 rounded-2xl border-2 cursor-pointer transition-all",
+                                   "p-5 rounded-2xl border-2 cursor-pointer transition-all relative overflow-hidden",
                                    isSelected ? "border-teal-500 bg-teal-50/30 shadow-md" : "border-slate-100 bg-slate-50/50 hover:border-slate-200"
                                  )}
                                >
+                                 {isRecommended && !isSelected && (
+                                   <div className="absolute top-0 right-0 px-2 py-0.5 bg-teal-50 text-[8px] font-black text-teal-600 rounded-bl-xl border-l border-b border-teal-100 shadow-sm z-10">
+                                      RECOMMENDED
+                                   </div>
+                                 )}
                                  <div className="flex items-start justify-between mb-3">
                                    <div className={cn(
                                      "w-10 h-10 rounded-xl flex items-center justify-center transition-all",

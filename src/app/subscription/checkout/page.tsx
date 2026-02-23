@@ -24,6 +24,61 @@ import {
 import { toast } from 'react-hot-toast';
 import Script from 'next/script';
 
+const BUSINESS_TYPE_MODULES: Record<string, { recommended: string[], visible: string[] }> = {
+  RESTAURANT: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE', 'DIGITAL_MENU_QR'],
+    visible: ['RECIPE_MANAGEMENT', 'KITCHEN_DISPLAY'],
+  },
+  BAR: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE', 'DIGITAL_MENU_QR', 'TABLE_MANAGEMENT', 'SAVE_DRAFTS'],
+    visible: ['RECIPE_MANAGEMENT'],
+  },
+  LOUNGE: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE', 'DIGITAL_MENU_QR', 'TABLE_MANAGEMENT', 'SAVE_DRAFTS'],
+    visible: ['RECIPE_MANAGEMENT', 'KITCHEN_DISPLAY'],
+  },
+  SUPERMARKET: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE'],
+    visible: ['WHATSAPP_ALERTS'],
+  },
+  RETAIL: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE'],
+    visible: ['WHATSAPP_ALERTS'],
+  },
+  BOUTIQUE: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE'],
+    visible: ['WHATSAPP_ALERTS'],
+  },
+  PHARMACY: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE'],
+    visible: ['WHATSAPP_ALERTS'],
+  },
+  CLINIC: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE'],
+    visible: ['WHATSAPP_ALERTS'],
+  },
+  BAKERY: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE', 'RECIPE_MANAGEMENT'],
+    visible: ['KITCHEN_DISPLAY'],
+  },
+  HOTEL: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE', 'TABLE_MANAGEMENT', 'SAVE_DRAFTS', 'DIGITAL_MENU_QR'],
+    visible: ['KITCHEN_DISPLAY', 'RECIPE_MANAGEMENT'],
+  },
+  FUEL_STATION: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE', 'BULK_STOCK_MANAGEMENT'],
+    visible: ['WHATSAPP_ALERTS'],
+  },
+  LPG_STATION: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE', 'BULK_STOCK_MANAGEMENT'],
+    visible: ['WHATSAPP_ALERTS'],
+  },
+  OTHER: {
+    recommended: ['ADVANCED_INVENTORY', 'AUTOMATED_COMPLIANCE'],
+    visible: ['WHATSAPP_ALERTS', 'SAVE_DRAFTS'],
+  }
+};
+
 export default function CheckoutPage() {
   const router = useRouter();
   const { business, user } = useAuth();
@@ -297,19 +352,29 @@ export default function CheckoutPage() {
            <div className="space-y-4">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">2. Customize Features</label>
               <div className="grid grid-cols-1 gap-3">
-                 {availableModules.map((mod) => {
+                 {availableModules.filter((mod) => {
+                   const config = BUSINESS_TYPE_MODULES[business?.type || 'OTHER'] || BUSINESS_TYPE_MODULES.OTHER;
+                   return config.recommended.includes(mod.type) || config.visible.includes(mod.type);
+                 }).map((mod) => {
+                   const config = BUSINESS_TYPE_MODULES[business?.type || 'OTHER'] || BUSINESS_TYPE_MODULES.OTHER;
+                   const isRecommended = config.recommended.includes(mod.type);
                    const isSelected = selectedModules.includes(mod.type);
                    return (
                      <div 
                         key={mod.type}
                         onClick={() => toggleModule(mod.type)}
                         className={cn(
-                            "flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer",
+                            "flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer relative",
                             isSelected 
                                 ? "border-teal-500 bg-teal-50/30" 
                                 : "border-slate-200 bg-white hover:border-slate-300"
                         )}
                      >
+                        {isRecommended && !isSelected && (
+                          <div className="absolute top-0 right-0 px-2 py-0.5 bg-teal-50 text-[8px] font-black text-teal-600 rounded-bl-xl border-l border-b border-teal-100 shadow-sm z-10">
+                             RECOMMENDED
+                          </div>
+                        )}
                         <div className="flex items-center gap-4">
                             <div className={cn(
                                 "w-5 h-5 rounded-md border flex items-center justify-center transition-colors",
