@@ -521,6 +521,13 @@ function RegisterForm() {
                             : `Trial ends on ${new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toLocaleDateString()}`
                            }
                          </p>
+                         <div className="mt-4 p-3 bg-white/5 rounded-xl border border-white/10">
+                            <p className="text-[11px] font-black text-teal-400 uppercase tracking-widest mb-1">Access Anywhere</p>
+                            <p className="text-[10px] text-white font-bold leading-relaxed">
+                               One license. Use on any device — mobile, desktop, or web.
+                            </p>
+                            <p className="text-[9px] text-slate-500 mt-1 italic">User limits apply.</p>
+                         </div>
                       </div>
 
                       {/* Show pricing comparison only when NOT in pay immediately mode */}

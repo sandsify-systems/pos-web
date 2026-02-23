@@ -254,6 +254,14 @@ export default function CheckoutPage() {
               <p className="text-base text-slate-500 font-medium max-w-lg leading-relaxed">
                  Select your billing cycle and add-on features. Customize your terminal to fit your business needs.
               </p>
+
+              <div className="bg-white border border-slate-100 p-4 rounded-3xl shadow-sm inline-flex flex-col gap-1 mt-4">
+                 <p className="text-[10px] font-black text-teal-600 uppercase tracking-widest">Unified Access</p>
+                 <p className="text-sm font-black text-slate-900 leading-tight">
+                   One license. Use on any device — mobile, desktop, or web.
+                 </p>
+                 <p className="text-[10px] text-slate-400 font-bold italic">User limits apply.</p>
+              </div>
            </div>
 
            {/* 1. Cycle Selection */}

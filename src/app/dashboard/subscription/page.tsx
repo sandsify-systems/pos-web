@@ -180,6 +180,10 @@ export default function SubscriptionPage() {
           <div className="space-y-1">
             <h1 className="text-3xl font-black text-slate-900 tracking-tighter">Manage Subscription</h1>
             <p className="text-slate-500 font-medium">Upgrade or renew your business terminal features.</p>
+            <div className="bg-teal-50 border border-teal-100 p-3 rounded-2xl flex items-center gap-3 w-fit">
+              <div className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
+              <p className="text-xs font-black text-teal-700 tracking-tight">One license. Use on any device — mobile, desktop, or web.</p>
+            </div>
           </div>
         </div>
         
