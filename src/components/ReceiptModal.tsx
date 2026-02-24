@@ -45,7 +45,100 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
   const canVoid = ['owner', 'admin', 'manager'].includes(userRole) && !isVoided;
 
   const handlePrint = () => {
-     window.print();
+     const printWindow = window.open('', '_blank', 'width=400,height=600');
+     if (!printWindow) return;
+
+     const paperWidth = printerPaperSize === '58mm' ? '58mm' : '80mm';
+     const fontSize = printerPaperSize === '58mm' ? '9px' : '11px';
+
+     // Build items HTML from component state
+     let itemsHtml = '';
+     if (saleItems.length > 0) {
+       saleItems.forEach((item: any) => {
+         const name = item.product_name || item.product?.name || item.name || 'Item';
+         const price = (item.unit_price || item.price || 0) * item.quantity;
+         itemsHtml += `<div style="display:flex;justify-content:space-between;padding:2px 0;">
+           <span>${item.quantity}x ${name}</span>
+           <span style="font-weight:600;">${formatCurrency(price, business?.currency)}</span>
+         </div>`;
+       });
+     } else {
+       itemsHtml = '<div style="text-align:center;color:#999;font-style:italic;padding:4px 0;">Item details unavailable</div>';
+     }
+
+     // Format date
+     const dateStr = sale.created_at || sale.createdAt
+       ? new Date(sale.created_at || sale.createdAt!).toLocaleString()
+       : 'Date N/A';
+
+     // Void section
+     let voidHtml = '';
+     if (isVoided) {
+       voidHtml = `<div style="margin-top:6px;padding:4px;border:1px solid #dc2626;background:#fef2f2;">
+         <div style="font-size:0.75em;font-weight:bold;color:#dc2626;text-transform:uppercase;">Reason for voiding:</div>
+         <div style="font-size:0.9em;font-style:italic;">${(sale as any).void_reason || 'Administrative correction'}</div>
+       </div>`;
+     }
+
+     printWindow.document.write(`
+       <!DOCTYPE html>
+       <html>
+       <head>
+         <title>Receipt</title>
+         <style>
+           @page { margin: 0; size: ${paperWidth} auto; }
+           * { margin: 0; padding: 0; box-sizing: border-box; }
+           body {
+             width: ${paperWidth};
+             font-family: 'Courier New', monospace;
+             font-size: ${fontSize};
+             color: #000;
+             background: #fff;
+             padding: 2mm;
+           }
+         </style>
+       </head>
+       <body>
+         <div style="text-align:center;margin-bottom:8px;">
+           ${isVoided ? '<div style="font-weight:bold;font-size:0.85em;color:#dc2626;text-transform:uppercase;">*** VOIDED ***</div>' : ''}
+           <div style="font-weight:bold;font-size:1.1em;text-transform:uppercase;letter-spacing:0.1em;">${business?.name || ''}</div>
+           <div style="font-size:0.85em;color:#666;">${dateStr}</div>
+           <div style="font-size:0.75em;font-family:monospace;color:#999;">Ref: ${saleRef}</div>
+         </div>
+         <div style="border-top:1px dashed #333;border-bottom:1px dashed #333;padding:6px 0;margin:6px 0;">
+           ${itemsHtml}
+         </div>
+         <div>
+           <div style="display:flex;justify-content:space-between;padding:2px 0;">
+             <span>Subtotal</span>
+             <span>${formatCurrency(Number(sale.subtotal || (sale as any).subtotal || 0), business?.currency)}</span>
+           </div>
+           <div style="display:flex;justify-content:space-between;padding:6px 0 2px;border-top:1px solid #ccc;margin-top:4px;font-weight:bold;font-size:1.1em;">
+             <span>Total</span>
+             <span${isVoided ? ' style="text-decoration:line-through;color:#999;"' : ''}>${formatCurrency(Number(saleTotal || 0), business?.currency)}</span>
+           </div>
+           <div style="display:flex;justify-content:space-between;padding:2px 0;font-size:0.85em;color:#666;">
+             <span>Payment</span>
+             <span style="font-weight:500;text-transform:uppercase;">${salePayMethod || ''}</span>
+           </div>
+         </div>
+         ${voidHtml}
+         <div style="text-align:center;font-size:0.75em;margin-top:10px;">
+           <p>Thank you for your patronage!</p>
+           <p style="margin-top:2px;color:#999;">Powered by AlphaKit POS</p>
+         </div>
+       </body>
+       </html>
+     `);
+
+     printWindow.document.close();
+
+     // Wait for content to render, then print
+     setTimeout(() => {
+       printWindow.focus();
+       printWindow.print();
+       printWindow.close();
+     }, 300);
   };
 
   const handleVoidSale = async () => {
@@ -75,28 +168,6 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({ isOpen, onClose, sal
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-      <style dangerouslySetInnerHTML={{ __html: `
-        @media print {
-          @page {
-            margin: 0;
-            size: ${printerPaperSize === '58mm' ? '58mm auto' : '80mm auto'};
-          }
-          body * {
-            visibility: hidden;
-          }
-          #receipt-content, #receipt-content * {
-            visibility: visible;
-          }
-          #receipt-content {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: ${printerPaperSize === '58mm' ? '58mm' : '80mm'};
-            padding: 4mm;
-            font-size: 10px;
-          }
-        }
-      `}} />
       <div className="bg-white w-full max-w-md rounded-2xl shadow-xl overflow-hidden relative flex flex-col max-h-[90vh]">
         <button 
           onClick={onClose}

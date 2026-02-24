@@ -49,5 +49,10 @@ export const ProductService = {
 
   deleteCategory: async (id: number): Promise<void> => {
     await apiClient.delete(`/categories/${id}`);
+  },
+
+  getPublicMenu: async (slug: string): Promise<{ business: any, categories: Category[], products: Product[] }> => {
+    const res = await apiClient.get(`/public/menu/${slug}`);
+    return res.data;
   }
 };

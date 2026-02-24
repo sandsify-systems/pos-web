@@ -15,6 +15,7 @@ import {
 import { toast } from 'react-hot-toast';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSettings } from '@/contexts/SettingsContext';
 import { SalesService } from '@/services/sales.service';
 import { formatCurrency, cn } from '@/lib/utils';
 
@@ -22,6 +23,7 @@ export default function CheckoutPage() {
   const router = useRouter();
   const { items, getTotal, getSubtotal, clearCart } = useCart();
   const { business, user, activeShift } = useAuth();
+  const { printerPaperSize } = useSettings();
   
   const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CARD' | 'TRANSFER'>('CASH');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -58,7 +60,88 @@ export default function CheckoutPage() {
   };
 
   const handlePrint = () => {
-    window.print();
+    const receiptEl = document.getElementById('checkout-receipt');
+    if (!receiptEl) return;
+
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    if (!printWindow) return;
+
+    const paperWidth = printerPaperSize === '58mm' ? '58mm' : '80mm';
+    const fontSize = printerPaperSize === '58mm' ? '9px' : '11px';
+
+    // Gather receipt data directly from state
+    const saleItems = completedSale?.items || [];
+    const saleDate = completedSale?.sale?.created_at || completedSale?.created_at 
+      ? new Date(completedSale?.sale?.created_at || completedSale?.created_at).toLocaleString() 
+      : new Date().toLocaleString();
+    const saleRefNo = completedSale?.receipt_no || completedSale?.sale?.id || completedSale?.id || '';
+    const subtotal = Number(completedSale?.sale?.subtotal || completedSale?.subtotal || 0);
+    const total = Number(completedSale?.sale?.total || completedSale?.total || 0);
+    const method = completedSale?.sale?.payment_method || paymentMethod;
+
+    let itemsHtml = '';
+    saleItems.forEach((item: any) => {
+      itemsHtml += `<div style="display:flex;justify-content:space-between;padding:2px 0;">
+        <span>${item.quantity}x ${item.product_name || item.product?.name || 'Item'}</span>
+        <span style="font-weight:600;">${formatCurrency(item.unit_price * item.quantity, business?.currency)}</span>
+      </div>`;
+    });
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Receipt</title>
+        <style>
+          @page { margin: 0; size: ${paperWidth} auto; }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body {
+            width: ${paperWidth};
+            font-family: 'Courier New', monospace;
+            font-size: ${fontSize};
+            color: #000;
+            background: #fff;
+            padding: 2mm;
+          }
+        </style>
+      </head>
+      <body>
+        <div style="text-align:center;margin-bottom:8px;">
+          <div style="font-weight:bold;font-size:1.1em;text-transform:uppercase;letter-spacing:0.1em;">${business?.name || ''}</div>
+          <div style="font-size:0.85em;color:#666;">${saleDate}</div>
+          <div style="font-size:0.75em;font-family:monospace;color:#999;">Ref: ${saleRefNo}</div>
+        </div>
+        <div style="border-top:1px dashed #333;border-bottom:1px dashed #333;padding:6px 0;margin:6px 0;">
+          ${itemsHtml || '<div style="text-align:center;color:#999;font-style:italic;">No items</div>'}
+        </div>
+        <div>
+          <div style="display:flex;justify-content:space-between;padding:2px 0;">
+            <span>Subtotal</span>
+            <span>${formatCurrency(subtotal, business?.currency)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0 2px;border-top:1px solid #ccc;margin-top:4px;font-weight:bold;font-size:1.1em;">
+            <span>Total Paid</span>
+            <span>${formatCurrency(total, business?.currency)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:2px 0;font-size:0.85em;color:#666;">
+            <span>Payment</span>
+            <span style="font-weight:500;text-transform:uppercase;">${method}</span>
+          </div>
+        </div>
+        <div style="text-align:center;font-size:0.75em;margin-top:10px;">
+          <p>Thank you for your patronage!</p>
+          <p style="margin-top:2px;color:#999;">Powered by AlphaKit POS</p>
+        </div>
+      </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    setTimeout(() => {
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
+    }, 300);
   };
 
   if (items.length === 0 && !completedSale) {
@@ -70,6 +153,19 @@ export default function CheckoutPage() {
   if (completedSale) {
     return (
       <div className="min-h-full flex items-center justify-center p-6 bg-slate-50/50">
+        <style dangerouslySetInnerHTML={{ __html: `
+          @media print {
+            @page {
+              margin: 0;
+              size: ${printerPaperSize === '58mm' ? '58mm auto' : '80mm auto'};
+            }
+            #checkout-receipt {
+              width: ${printerPaperSize === '58mm' ? '58mm' : '80mm'} !important;
+              padding: 2mm !important;
+              font-size: ${printerPaperSize === '58mm' ? '9px' : '11px'} !important;
+            }
+          }
+        `}} />
         <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-300 print:shadow-none print:w-full">
           <div className="bg-teal-600 p-8 text-white text-center print:hidden">
             <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
@@ -79,7 +175,7 @@ export default function CheckoutPage() {
             <p className="opacity-90 mt-1">Transaction completed</p>
           </div>
 
-          <div className="p-8 space-y-6 print:p-0">
+          <div className="p-8 space-y-6 print:p-0" id="checkout-receipt">
             {/* Receipt Content */}
             <div className="text-center space-y-1 mb-6">
               <h2 className="font-bold text-xl text-slate-900 uppercase tracking-widest">{business?.name}</h2>

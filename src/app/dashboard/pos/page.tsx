@@ -162,12 +162,10 @@ export default function POSPage() {
       clearCart();
       
       resumed.items.forEach((item: any) => {
+        const currentProd = products.find(p => p.id === item.product.id);
         addItem({
-            id: item.product.id,
-            name: item.product_name || item.product.name,
-            price: item.unit_price || item.product.price, 
-            stock: 9999, // Assumption or fetch real stock
-            category_id: 0, 
+            ...item.product,
+            stock: currentProd ? currentProd.stock : (item.product.stock || 0),
         } as Product, item.quantity);
       });
 

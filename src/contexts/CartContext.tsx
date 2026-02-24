@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { createContext, useState, useContext, useCallback } from "react";
+import React, { createContext, useState, useContext, useCallback, useEffect } from "react";
 import { toast } from "react-hot-toast";
 import { CartItem, Product } from "../types/pos";
 
@@ -21,6 +21,27 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // Load cart from localStorage on mount
+  useEffect(() => {
+    const savedCart = localStorage.getItem('pos_cart_items');
+    if (savedCart) {
+      try {
+        setItems(JSON.parse(savedCart));
+      } catch (e) {
+        console.error("Failed to parse cart items from storage", e);
+      }
+    }
+    setIsLoaded(true);
+  }, []);
+
+  // Sync cart to localStorage whenever it changes
+  useEffect(() => {
+    if (isLoaded) {
+      localStorage.setItem('pos_cart_items', JSON.stringify(items));
+    }
+  }, [items, isLoaded]);
 
   const addItem = useCallback((product: Product, quantity = 1) => {
     if (product.stock <= 0) {
