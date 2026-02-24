@@ -82,6 +82,28 @@ const BUSINESS_TYPE_MODULES: Record<string, { recommended: string[], visible: st
   }
 };
 
+const FALLBACK_PRICING = {
+  plans: [
+    { type: 'MONTHLY', name: 'Standard Monthly', price: 30000, duration_days: 30, description: 'Optimized for 3 staff and 300 products.' },
+    { type: 'QUARTERLY', name: 'Standard Quarterly', price: 81000, duration_days: 90, description: 'Optimized for 7 staff and 1500 products.' },
+    { type: 'ANNUAL', name: 'Standard Annual', price: 300000, duration_days: 365, description: 'Optimized for 15 staff and 5000 products.' },
+    { type: 'SERVICE_MONTHLY', name: 'Basic Sales POS (Monthly)', price: 15000, duration_days: 30, description: 'Strictly for kiosks/LPG/small shops.' },
+    { type: 'SERVICE_QUARTERLY', name: 'Basic Sales POS (Quarterly)', price: 40000, duration_days: 90, description: 'Strictly for kiosks/LPG/small shops.' },
+    { type: 'SERVICE_ANNUAL', name: 'Basic Sales POS (Annual)', price: 150000, duration_days: 365, description: 'Strictly for kiosks/LPG/small shops.' }
+  ],
+  modules: [
+    { type: 'KITCHEN_DISPLAY', name: 'Kitchen Display System (KDS)', price: 5000, description: 'Real-time kitchen order monitor for chefs' },
+    { type: 'TABLE_MANAGEMENT', name: 'Table Management', price: 5000, description: 'Track floor layouts and table status' },
+    { type: 'SAVE_DRAFTS', name: 'Save Drafts', price: 4000, description: 'Save and resume incomplete orders' },
+    { type: 'ADVANCED_INVENTORY', name: 'Advanced Inventory Control', price: 18000, description: 'Batch tracking, shrinkage alerts, and stock history' },
+    { type: 'RECIPE_MANAGEMENT', name: 'Recipe & Cost Control (BOM)', price: 15000, description: 'Ingredient-level cost tracking per item sold' },
+    { type: 'WHATSAPP_ALERTS', name: 'Security & Owner WhatsApp Alerts', price: 8000, description: 'Instant alerts for voids, overrides, refunds, and logins' },
+    { type: 'AUTOMATED_COMPLIANCE', name: 'Automated Compliance & Audit Replay', price: 15000, description: 'Tax-ready reports, audit trail, and activity playback' },
+    { type: 'DIGITAL_MENU_QR', name: 'QR Digital Menu', price: 8000, description: 'Public QR-based digital menu with live product updates' },
+    { type: 'BULK_STOCK_MANAGEMENT', name: 'Bulk Stock & Round Tracking', price: 12000, description: 'Specialized tracking for fuel, gas, and bulk commodities.' }
+  ]
+};
+
 function RegisterForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -108,8 +130,8 @@ function RegisterForm() {
     billing_cycle: 'MONTHLY' as 'MONTHLY' | 'QUARTERLY' | 'ANNUAL',
   });
 
-  const [availableModules, setAvailableModules] = useState<any[]>([]);
-  const [availablePlans, setAvailablePlans] = useState<any[]>([]);
+  const [availableModules, setAvailableModules] = useState<any[]>(FALLBACK_PRICING.modules);
+  const [availablePlans, setAvailablePlans] = useState<any[]>(FALLBACK_PRICING.plans);
   const [showAdvancedModules, setShowAdvancedModules] = useState(false);
 
   useEffect(() => {
