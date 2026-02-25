@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+import { SubscriptionService, PaymentMethod } from "@/services/subscription.service";
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'next/navigation';
 import { formatCurrency, cn } from '@/lib/utils';
@@ -35,6 +36,16 @@ export default function SubscriptionPage() {
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
   const [processing, setProcessing] = useState(false);
   const [isBasicMode, setIsBasicMode] = useState(false);
+  
+  const [promoCode, setPromoCode] = useState("");
+  const [isVerifyingPromo, setIsVerifyingPromo] = useState(false);
+  const [promoDiscount, setPromoDiscount] = useState(0);
+  const [appliedPromo, setAppliedPromo] = useState<string | null>(null);
+
+  const [savedCards, setSavedCards] = useState<PaymentMethod[]>([]);
+  const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
+  const [isLoadingCards, setIsLoadingCards] = useState(false);
+  const [isUsingSavedCard, setIsUsingSavedCard] = useState(false);
 
   // Initialize from current subscription
   useEffect(() => {
@@ -51,6 +62,26 @@ export default function SubscriptionPage() {
     }
   }, [activeModules, subscription]);
 
+  useEffect(() => {
+    const fetchCards = async () => {
+        setIsLoadingCards(true);
+        try {
+            const cards = await SubscriptionService.getSavedCards();
+            setSavedCards(cards);
+            if (cards.length > 0) {
+                const defaultCard = cards.find(c => c.is_default) || cards[0];
+                setSelectedCardId(defaultCard.id);
+                setIsUsingSavedCard(true);
+            }
+        } catch (error) {
+            console.error('Failed to fetch cards:', error);
+        } finally {
+            setIsLoadingCards(false);
+        }
+    };
+    fetchCards();
+  }, []);
+
   const toggleModule = (moduleType: string) => {
     setSelectedModules(prev => {
       const next = prev.includes(moduleType) 
@@ -61,40 +92,67 @@ export default function SubscriptionPage() {
     });
   };
 
-  const { finalTotal, originalTotal, savings, discountPercent, currentBasePlan } = useMemo(() => {
-    const basePlanMonthly = plans.find(p => p.type === (isBasicMode ? 'SERVICE_MONTHLY' : 'MONTHLY'));
+  const { finalTotal, originalTotal, savings, discountPercent, currentBasePlan, isProratedAddon, newModulesCount } = useMemo(() => {
+    const isWithinActivePlan = isSubscribed && subscription?.plan_type === (isBasicMode ? `SERVICE_${billingCycle}` : billingCycle);
     const currentBasePlan = plans.find(p => p.type === (isBasicMode ? `SERVICE_${billingCycle}` : billingCycle));
+    const basePlanMonthly = plans.find(p => p.type === (isBasicMode ? 'SERVICE_MONTHLY' : 'MONTHLY'));
     
     const monthMultiplier = billingCycle === 'ANNUAL' ? 12 : billingCycle === 'QUARTERLY' ? 3 : 1;
     const cycleDiscount = billingCycle === 'ANNUAL' ? 0.85 : billingCycle === 'QUARTERLY' ? 0.9 : 1;
-    
-    // Calculate Original Total (Pure monthly rates, no discounts)
-    let originalModulesTotal = 0;
-    selectedModules.forEach(modType => {
-        const mod = availableModules.find(m => m.type === modType);
-        if (mod) originalModulesTotal += mod.price * monthMultiplier;
-    });
-    const originalTotal = (basePlanMonthly?.price || 0) * monthMultiplier + originalModulesTotal;
 
-    // Calculate Final Total
-    let finalModulesTotal = 0;
-    
-    selectedModules.forEach(modType => {
-        const mod = availableModules.find(m => m.type === modType);
-        if (mod) finalModulesTotal += mod.price * monthMultiplier * cycleDiscount;
-    });
+    // Check which modules are new vs already active
+    const activeModTypes = activeModules.map(m => m.module);
+    const newModules = selectedModules.filter(m => !activeModTypes.includes(m));
 
-    const finalTotal = (currentBasePlan?.price || 0) + finalModulesTotal;
+    let finalTotal = 0;
+    let originalTotal = 0;
+    let isProratedAddon = false;
+
+    if (isWithinActivePlan && daysRemaining > 5) {
+      // SCENARIO: MID-CYCLE ADD-ON
+      isProratedAddon = true;
+      
+      newModules.forEach(modType => {
+        const mod = availableModules.find(m => m.type === modType);
+        if (mod) {
+          // Prorate: (Price / 30) * daysRemaining
+          const proratedPrice = (mod.price / 30) * daysRemaining;
+          finalTotal += proratedPrice;
+          originalTotal += proratedPrice;
+        }
+      });
+      // Base plan and existing modules are already paid
+    } else {
+      // SCENARIO: FRESH START OR RENEWAL
+      const basePriceWithCycle = currentBasePlan?.price || 0;
+      finalTotal = basePriceWithCycle;
+      originalTotal = (basePlanMonthly?.price || 0) * monthMultiplier;
+
+      selectedModules.forEach(modType => {
+        const mod = availableModules.find(m => m.type === modType);
+        if (mod) {
+          finalTotal += mod.price * monthMultiplier * cycleDiscount;
+          originalTotal += mod.price * monthMultiplier;
+        }
+      });
+    }
+
+    if (promoDiscount > 0 && !isProratedAddon) {
+      finalTotal = finalTotal * (1 - promoDiscount / 100);
+    }
+
     const savings = originalTotal - finalTotal;
 
     return {
-        finalTotal,
+        finalTotal: Math.max(0, finalTotal),
         originalTotal,
         savings,
-        discountPercent: Math.round((savings / originalTotal) * 100) || 0,
-        currentBasePlan
+        discountPercent: isProratedAddon ? 0 : (Math.round((savings / originalTotal) * 100) || 0),
+        currentBasePlan,
+        isProratedAddon,
+        newModulesCount: newModules.length
     };
-  }, [billingCycle, selectedModules, plans, availableModules, isBasicMode]);
+  }, [billingCycle, selectedModules, plans, availableModules, isBasicMode, isSubscribed, subscription, daysRemaining, activeModules, promoDiscount]);
 
   const handlePay = () => {
     if (!user || !business) {
@@ -102,12 +160,30 @@ export default function SubscriptionPage() {
       return;
     }
 
-    if (!(window as any).PaystackPop) {
+    if (!(window as any).PaystackPop && !isUsingSavedCard) {
       toast.error('Payment gateway not loaded yet. Please wait a moment.');
       return;
     }
 
     setProcessing(true);
+    const planType = isBasicMode ? `SERVICE_${billingCycle}` : billingCycle;
+
+    if (isUsingSavedCard && selectedCardId) {
+        toast.loading('Processing with saved card...', { id: 'saved-card-pay' });
+        SubscriptionService.chargeSavedCard({
+            plan_type: planType,
+            modules: selectedModules,
+            card_id: selectedCardId
+        }).then(() => {
+            toast.success('Subscription updated successfully!', { id: 'saved-card-pay' });
+            router.refresh();
+        }).catch((err: any) => {
+            toast.error(err.response?.data?.error || 'Failed to process saved card payment', { id: 'saved-card-pay' });
+        }).finally(() => {
+            setProcessing(false);
+        });
+        return;
+    }
     
     const handler = (window as any).PaystackPop.setup({
       key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY || 'pk_test_c4d6b6735388bf536ab1cc72ad8961397078eb08', 
@@ -143,7 +219,9 @@ export default function SubscriptionPage() {
       await processSubscription(
         planType, 
         response.reference, 
-        selectedModules
+        selectedModules,
+        undefined,
+        appliedPromo || undefined
       );
       
       toast.success('Subscription updated successfully!', { id: 'activation' });
@@ -354,40 +432,164 @@ export default function SubscriptionPage() {
                  {/* Base Plan */}
                  <div className="flex justify-between items-start">
                     <div className="space-y-1">
-                        <p className="text-xs font-black text-slate-400 uppercase tracking-wider">Base Terminal</p>
+                        <p className="text-xs font-black text-slate-400 uppercase tracking-wider">
+                          {isProratedAddon ? 'Current Plan' : 'Base Terminal'}
+                        </p>
                         <p className="text-sm font-bold text-slate-800">{currentBasePlan?.name || 'Base Plan'}</p>
                     </div>
                     <p className="text-sm font-black text-slate-900">
-                        {formatCurrency(plans.find(p => p.type === (isBasicMode ? `SERVICE_${billingCycle}` : billingCycle))?.price || 0)}
+                        {isProratedAddon ? 'Active' : formatCurrency(plans.find(p => p.type === (isBasicMode ? `SERVICE_${billingCycle}` : billingCycle))?.price || 0)}
                     </p>
                  </div>
 
                  {/* Modules */}
-                 {selectedModules.length > 0 && (
+                 {newModulesCount > 0 && (
                      <div className="space-y-3 pt-4 border-t border-slate-50">
-                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4">Premium Add-ons</p>
+                        <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.2em] mb-4">
+                          {isProratedAddon ? 'New Add-ons (Prorated)' : 'Premium Add-ons'}
+                        </p>
                         {selectedModules.map(modType => {
-                            const mod = availableModules.find(m => m.type === modType);
-                            if (!mod) return null;
-                            const monthMultiplier = billingCycle === 'ANNUAL' ? 12 : billingCycle === 'QUARTERLY' ? 3 : 1;
-                            const discount = billingCycle === 'ANNUAL' ? 0.85 : billingCycle === 'QUARTERLY' ? 0.9 : 1;
-                            return (
-                                <div key={modType} className="flex justify-between items-center bg-slate-50/50 p-3 rounded-2xl border border-slate-100/50">
-                                    <span className="text-xs font-bold text-slate-600 truncate max-w-[140px]">{mod.name}</span>
-                                    <span className="text-xs font-black text-slate-900">{formatCurrency(mod.price * monthMultiplier * discount)}</span>
-                                </div>
-                            );
+                           const mod = availableModules.find(m => m.type === modType);
+                           if (!mod) return null;
+                           const isActive = activeModules.some(m => m.module === modType);
+                           if (isProratedAddon && isActive) return null; // Don't show already active ones in breakdown if prorating
+
+                           const monthMultiplier = billingCycle === 'ANNUAL' ? 12 : billingCycle === 'QUARTERLY' ? 3 : 1;
+                           const discount = billingCycle === 'ANNUAL' ? 0.85 : billingCycle === 'QUARTERLY' ? 0.9 : 1;
+                           const price = isProratedAddon ? (mod.price / 30) * daysRemaining : (mod.price * monthMultiplier * discount);
+                           
+                           return (
+                               <div key={modType} className="flex justify-between items-center bg-slate-50/50 p-3 rounded-2xl border border-slate-100/50">
+                                   <span className="text-xs font-bold text-slate-600 truncate max-w-[140px]">{mod.name}</span>
+                                   <span className="text-xs font-black text-slate-900">{formatCurrency(price)}</span>
+                               </div>
+                           );
                         })}
+                        {isProratedAddon && (
+                          <div className="flex items-center gap-2 p-3 bg-teal-50 rounded-xl border border-teal-100">
+                            <Info size={12} className="text-teal-600 flex-shrink-0" />
+                            <p className="text-[10px] font-bold text-teal-700">
+                              Prorated for {daysRemaining} days remaining.
+                            </p>
+                          </div>
+                        )}
                      </div>
                  )}
               </div>
 
-              {/* Total Calculation */}
+              {/* Promo Code Input */}
+              <div className="pt-4 border-t border-slate-50">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-1">Promo Code</label>
+                <div className="flex gap-2">
+                    <input 
+                        type="text" 
+                        placeholder="CODE"
+                        value={promoCode}
+                        onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                        className={cn(
+                            "flex-1 px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-teal-500",
+                            appliedPromo && "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        )}
+                    />
+                    <button 
+                        type="button"
+                        disabled={!promoCode || isVerifyingPromo}
+                        onClick={async () => {
+                            if (appliedPromo === promoCode) {
+                                setAppliedPromo(null);
+                                setPromoDiscount(0);
+                                setPromoCode("");
+                                return;
+                            }
+                            setIsVerifyingPromo(true);
+                            try {
+                                const res = await SubscriptionService.validatePromoCode(promoCode);
+                                if (res.success) {
+                                    setPromoDiscount(res.discount_percentage);
+                                    setAppliedPromo(promoCode);
+                                    toast.success(`Promo code applied: ${res.discount_percentage}% off!`);
+                                }
+                            } catch (error: any) {
+                                toast.error(error.response?.data?.error || 'Invalid promo code');
+                            } finally {
+                                setIsVerifyingPromo(false);
+                            }
+                        }}
+                        className="px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 text-white rounded-xl text-[10px] font-black uppercase transition-all"
+                    >
+                        {isVerifyingPromo ? <Loader2 size={12} className="animate-spin" /> : appliedPromo === promoCode ? "Remove" : "Apply"}
+                    </button>
+                </div>
+              </div>
+
+               {/* Saved Cards */}
+               {savedCards.length > 0 && (
+                   <div className="pt-4 border-t border-slate-50 space-y-3">
+                       <div className="flex justify-between items-center px-1">
+                           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Payment Method</label>
+                           <button 
+                               type="button"
+                               onClick={() => {
+                                   setIsUsingSavedCard(!isUsingSavedCard);
+                                   if (!isUsingSavedCard && savedCards.length > 0) {
+                                       setSelectedCardId(savedCards[0].id);
+                                   }
+                               }}
+                               className="text-[9px] font-bold text-teal-600 uppercase hover:underline"
+                           >
+                               {isUsingSavedCard ? "Add New Card" : "Use Saved Card"}
+                           </button>
+                       </div>
+                       
+                       {isUsingSavedCard && (
+                           <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
+                               {savedCards.map(card => (
+                                   <div 
+                                       key={card.id}
+                                       onClick={() => setSelectedCardId(card.id)}
+                                       className={cn(
+                                           "flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer group",
+                                           selectedCardId === card.id 
+                                               ? "bg-slate-900 border-slate-900 shadow-lg shadow-slate-200" 
+                                               : "bg-slate-50 border-slate-100 hover:border-slate-200"
+                                       )}
+                                   >
+                                       <div className="flex items-center gap-3">
+                                           <div className={cn(
+                                               "p-1.5 rounded-lg",
+                                               selectedCardId === card.id ? "bg-white/10" : "bg-white"
+                                           )}>
+                                               <CreditCard size={14} className={selectedCardId === card.id ? "text-white" : "text-slate-400"} />
+                                           </div>
+                                           <div>
+                                               <p className={cn("text-xs font-bold", selectedCardId === card.id ? "text-white" : "text-slate-700")}>
+                                                   {card.brand} ••• {card.last4}
+                                               </p>
+                                               <p className={cn("text-[9px] font-medium", selectedCardId === card.id ? "text-slate-400" : "text-slate-400")}>
+                                                   Exp {card.exp_month}/{card.exp_year}
+                                               </p>
+                                           </div>
+                                       </div>
+                                       {selectedCardId === card.id && (
+                                           <Check size={14} className="text-teal-400" />
+                                       )}
+                                   </div>
+                               ))}
+                           </div>
+                       )}
+                   </div>
+               )}
+
+               {/* Total Calculation */}
               <div className="pt-8 border-t-2 border-dashed border-slate-100">
                  <div className="flex justify-between items-end mb-8">
                     <div>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Final Total</p>
-                        <p className="text-[9px] text-teal-600 font-bold uppercase">{billingCycle} Billing</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">
+                          {isProratedAddon ? 'Add-on Total' : 'Final Total'}
+                        </p>
+                        <p className="text-[9px] text-teal-600 font-bold uppercase">
+                          {isProratedAddon ? 'Current Cycle' : `${billingCycle} Billing`}
+                        </p>
                     </div>
                     <div className="text-right">
                         {savings > 0 && (
@@ -405,14 +607,14 @@ export default function SubscriptionPage() {
                  <button 
                   type="button"
                   onClick={handlePay}
-                  disabled={processing}
+                  disabled={processing || (isProratedAddon && finalTotal <= 0)}
                   className="w-full py-5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-[2rem] font-black text-base transition-all shadow-xl active:scale-[0.98] flex items-center justify-center gap-3 group"
                 >
                     {processing ? (
                         <Loader2 className="w-5 h-5 animate-spin" />
                     ) : (
                         <>
-                            Secure Payment
+                            {isProratedAddon ? 'Add to Current Plan' : 'Secure Payment'}
                             <ArrowRight size={18} className="translate-x-0 group-hover:translate-x-1 transition-transform" />
                         </>
                     )}

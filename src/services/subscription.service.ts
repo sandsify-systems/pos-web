@@ -53,6 +53,21 @@ export interface SubscriptionStatusResponse {
   modules?: BusinessModule[];
 }
 
+export interface PaymentMethod {
+  id: number;
+  business_id: number;
+  email: string;
+  card_category: string;
+  card_type: string;
+  bank: string;
+  last4: string;
+  exp_month: string;
+  exp_year: string;
+  brand: string;
+  is_default: boolean;
+  created_at?: string;
+}
+
 export const SubscriptionService = {
   getPlans: async (): Promise<SubscriptionPlan[]> => {
     const response = await apiClient.get('/subscription/plans');
@@ -85,6 +100,21 @@ export const SubscriptionService = {
 
   validatePromoCode: async (code: string): Promise<{ success: boolean; discount_percentage: number }> => {
     const response = await apiClient.get(`/subscription/promo/validate?code=${code}`);
+    return response.data;
+  },
+
+  getSavedCards: async (): Promise<PaymentMethod[]> => {
+    const response = await apiClient.get('/subscription/cards');
+    return response.data;
+  },
+
+  chargeSavedCard: async (data: { plan_type: string; modules: string[]; bundle_code?: string; card_id: number }): Promise<Subscription> => {
+    const response = await apiClient.post('/subscription/charge-saved', data);
+    return response.data;
+  },
+
+  deleteSavedCard: async (id: number): Promise<any> => {
+    const response = await apiClient.delete(`/subscription/cards/${id}`);
     return response.data;
   },
 

@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -87,6 +87,11 @@ export default function CheckoutPage() {
   const [billingCycle, setBillingCycle] = useState<'MONTHLY' | 'QUARTERLY' | 'ANNUAL'>('MONTHLY');
   const [selectedModules, setSelectedModules] = useState<string[]>([]);
   const [processing, setProcessing] = useState(false);
+  
+  const [promoCode, setPromoCode] = useState("");
+  const [isVerifyingPromo, setIsVerifyingPromo] = useState(false);
+  const [promoDiscount, setPromoDiscount] = useState(0);
+  const [appliedPromo, setAppliedPromo] = useState<string | null>(null);
 
   // Initialize from previous subscription if available
   useEffect(() => {
@@ -119,41 +124,69 @@ export default function CheckoutPage() {
     });
   };
 
-  const calculateTotal = () => {
+  const { finalTotal, originalTotal, savings, discountPercent, isProratedAddon, newModulesCount } = useMemo(() => {
+    const isWithinActivePlan = isSubscribed && subscription?.plan_type === (business?.type === 'SERVICE' ? `SERVICE_${billingCycle}` : billingCycle);
     const basePlanMonthly = plans.find(p => p.type === (business?.type === 'SERVICE' ? 'SERVICE_MONTHLY' : 'MONTHLY'));
     const currentBasePlan = plans.find(p => p.type === (business?.type === 'SERVICE' ? `SERVICE_${billingCycle}` : billingCycle));
     
     const monthMultiplier = billingCycle === 'ANNUAL' ? 12 : billingCycle === 'QUARTERLY' ? 3 : 1;
     const cycleDiscount = billingCycle === 'ANNUAL' ? 0.85 : billingCycle === 'QUARTERLY' ? 0.9 : 1;
-    
-    // Calculate Original Total
-    let originalModulesTotal = 0;
-    selectedModules.forEach(modType => {
-        const mod = availableModules.find(m => m.type === modType);
-        if (mod) originalModulesTotal += mod.price * monthMultiplier;
-    });
-    const originalTotal = (basePlanMonthly?.price || 0) * monthMultiplier + originalModulesTotal;
 
-    // Calculate Final Total
-    let finalModulesTotal = 0;
-    
-    selectedModules.forEach(modType => {
-        const mod = availableModules.find(m => m.type === modType);
-        if (mod) finalModulesTotal += mod.price * monthMultiplier * cycleDiscount;
-    });
+    // Check which modules are new vs already active
+    const activeModTypes = activeModules.map(m => m.module);
+    const newModules = selectedModules.filter(m => !activeModTypes.includes(m));
 
-    const finalTotal = (currentBasePlan?.price || 0) + finalModulesTotal;
+    let finalTotal = 0;
+    let originalTotal = 0;
+    let isProratedAddon = false;
+
+    // Days remaining logic (safeguard)
+    const daysLeft = subscription?.end_date 
+      ? Math.max(0, Math.ceil((new Date(subscription.end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
+      : 0;
+
+    if (isWithinActivePlan && daysLeft > 5) {
+      // SCENARIO: MID-CYCLE ADD-ON
+      isProratedAddon = true;
+      
+      newModules.forEach(modType => {
+        const mod = availableModules.find(m => m.type === modType);
+        if (mod) {
+          const proratedPrice = (mod.price / 30) * daysLeft;
+          finalTotal += proratedPrice;
+          originalTotal += proratedPrice;
+        }
+      });
+    } else {
+      // SCENARIO: FRESH START OR RENEWAL
+      const basePriceWithCycle = currentBasePlan?.price || 0;
+      finalTotal = basePriceWithCycle;
+      originalTotal = (basePlanMonthly?.price || 0) * monthMultiplier;
+
+      selectedModules.forEach(modType => {
+        const mod = availableModules.find(m => m.type === modType);
+        if (mod) {
+          finalTotal += mod.price * monthMultiplier * cycleDiscount;
+          originalTotal += mod.price * monthMultiplier;
+        }
+      });
+    }
+
+    if (promoDiscount > 0 && !isProratedAddon) {
+      finalTotal = finalTotal * (1 - promoDiscount / 100);
+    }
+
     const savings = originalTotal - finalTotal;
 
     return {
-        finalTotal,
+        finalTotal: Math.max(0, finalTotal),
         originalTotal,
         savings,
-        discountPercent: Math.round((savings / originalTotal) * 100) || 0
+        discountPercent: isProratedAddon ? 0 : (Math.round((savings / originalTotal) * 100) || 0),
+        isProratedAddon,
+        newModulesCount: newModules.length
     };
-  };
-
-  const { finalTotal, originalTotal, savings, discountPercent } = calculateTotal();
+  }, [billingCycle, selectedModules, plans, availableModules, business?.type, isSubscribed, subscription, promoDiscount]);
 
   const handlePay = () => {
     if (!user || !business) {
@@ -208,7 +241,9 @@ export default function CheckoutPage() {
       await processSubscription(
         planType, 
         response.reference, 
-        selectedModules
+        selectedModules,
+        undefined,
+        appliedPromo || undefined
       );
       
       toast.success('Account activated successfully!', { id: 'activation' });
@@ -456,14 +491,14 @@ export default function CheckoutPage() {
                 <button 
                   type="button"
                   onClick={handlePay}
-                  disabled={processing}
+                  disabled={processing || (isProratedAddon && finalTotal <= 0)}
                   className="w-full py-5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400 text-white rounded-2xl font-black text-base transition-all shadow-lg active:scale-[0.98] flex items-center justify-center gap-2"
                 >
                     {processing ? (
                         <Loader2 className="w-5 h-5 animate-spin" />
                     ) : (
                         <>
-                            Secure Checkout
+                            {isProratedAddon ? 'Add to Account' : 'Secure Checkout'}
                             <ArrowRight size={18} />
                         </>
                     )}

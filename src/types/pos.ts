@@ -34,6 +34,8 @@ export interface SaleRequest {
   tax: number;
   discount: number;
   table_number?: string;
+  shift_id?: number;
+  terminal_provider?: string | null;
 }
 
 export interface SaleResponse {

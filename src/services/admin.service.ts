@@ -128,6 +128,11 @@ export const AdminService = {
     await apiClient.delete(`/admin/businesses/${id}`);
   },
 
+  resetBusinessData: async (id: number): Promise<{ message: string }> => {
+    const response = await apiClient.post(`/admin/businesses/${id}/reset`);
+    return response.data;
+  },
+
   // Subscriptions Actions
   renewSubscription: async (data: {
     business_id: number;

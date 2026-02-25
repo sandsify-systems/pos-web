@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { AdminService, Business, BusinessModule } from '../../../../services/admin.service';
-import { Plus, Search, Edit2, Trash2, Building, AlertCircle, Package } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, Building, AlertCircle, Package, RefreshCcw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 export default function AdminBusinessesPage() {
@@ -15,6 +15,7 @@ export default function AdminBusinessesPage() {
   const [selectedBizForModules, setSelectedBizForModules] = useState<Business | null>(null);
   const [bizModules, setBizModules] = useState<BusinessModule[]>([]);
   const [modulesLoading, setModulesLoading] = useState(false);
+  const [resettingId, setResettingId] = useState<number | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -70,6 +71,20 @@ export default function AdminBusinessesPage() {
       currency: biz.currency
     });
     setShowModal(true);
+  };
+
+  const handleResetData = async (biz: Business) => {
+    if (confirm(`CRITICAL ACTION: This will delete ALL sales, shifts, and audit logs for "${biz.name}". Quantities will be restored to stock. This is irreversible. Continue?`)) {
+      try {
+        setResettingId(biz.id);
+        const res = await AdminService.resetBusinessData(biz.id);
+        toast.success(res.message);
+      } catch (err: any) {
+        toast.error(err.response?.data?.error || 'Failed to reset data');
+      } finally {
+        setResettingId(null);
+      }
+    }
   };
 
   const handleDelete = async (id: number) => {
@@ -223,8 +238,17 @@ export default function AdminBusinessesPage() {
                       <Edit2 size={16} />
                     </button>
                     <button 
+                      onClick={() => handleResetData(biz)}
+                      disabled={resettingId === biz.id}
+                      className="p-2 hover:bg-amber-50 rounded-lg text-slate-500 hover:text-amber-600 transition-colors disabled:opacity-50"
+                      title="Reset Business Data"
+                    >
+                      <RefreshCcw size={16} className={resettingId === biz.id ? 'animate-spin' : ''} />
+                    </button>
+                    <button 
                       onClick={() => handleDelete(biz.id)}
                       className="p-2 hover:bg-rose-50 rounded-lg text-slate-500 hover:text-rose-600 transition-colors"
+                      title="Deactivate Business"
                     >
                       <Trash2 size={16} />
                     </button>
