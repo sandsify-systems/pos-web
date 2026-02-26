@@ -54,5 +54,16 @@ export const ProductService = {
   getPublicMenu: async (slug: string): Promise<{ business: any, categories: Category[], products: Product[] }> => {
     const res = await apiClient.get(`/public/menu/${slug}`);
     return res.data;
+  },
+
+  getInventorySummary: async (): Promise<any> => {
+    const res = await apiClient.get('/inventory/summary');
+    return res.data;
+  },
+
+  getLowStockProducts: async (): Promise<Product[]> => {
+    const res = await apiClient.get('/products/low-stock');
+    return res.data;
   }
 };
+

@@ -15,7 +15,8 @@ export interface Product {
   category_id: number;
   image_url?: string;
   sku?: string;
-  min_stock_level?: number;
+  min_stock?: number;
+  cost?: number;
 }
 
 export interface CartItem {

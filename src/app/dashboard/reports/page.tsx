@@ -24,9 +24,20 @@ import {
 import { useRouter } from 'next/navigation';
 import { ReceiptModal } from '@/components/ReceiptModal';
 import { SalesService } from '@/services/sales.service';
+import { ExpenseService, Expense } from '@/services/expense.service';
 import { toast } from 'react-hot-toast';
+import { 
+  ResponsiveContainer, 
+  AreaChart, 
+  Area, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend 
+} from 'recharts';
 
-type TabType = 'sales' | 'audit';
+type TabType = 'sales' | 'audit' | 'expenses';
 
 export default function ReportsPage() {
   const { business, user } = useAuth();
@@ -35,11 +46,19 @@ export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('sales');
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month' | 'custom'>('today');
   const [reportData, setReportData] = useState<DailyReport | SalesReport | null>(null);
+  const [productProfitData, setProductProfitData] = useState<any[]>([]);
+  const [monthlyFinancials, setMonthlyFinancials] = useState<any[]>([]);
   const [transactions, setTransactions] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'cash' | 'card'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [customDate, setCustomDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
+  // Expense State
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [expenseLoading, setExpenseLoading] = useState(false);
+  const [isAddExpenseOpen, setIsAddExpenseOpen] = useState(false);
+  const [newExpense, setNewExpense] = useState({ amount: '', category: 'Utilities', description: '', date: new Date().toISOString().split('T')[0] });
 
   // Audit Log State
   const [activities, setActivities] = useState<any[]>([]);
@@ -61,8 +80,10 @@ export default function ReportsPage() {
       }
       if (activeTab === 'sales') {
         fetchData();
-      } else {
+      } else if (activeTab === 'audit') {
         fetchActivities();
+      } else {
+        fetchExpenses();
       }
     }
   }, [selectedPeriod, business, user, isCashier, customDate, activeTab]);
@@ -107,10 +128,81 @@ export default function ReportsPage() {
       });
       setTransactions(sales);
 
+      // Fetch product performance if not cashier
+      if (!isCashier) {
+        const perfData = await ReportService.getProductProfitReport(startDateStr, endDateStr);
+        setProductProfitData(perfData);
+
+        // Fetch monthly data for the chart (always 6 months for trend)
+        const monthlyData = await ReportService.getMonthlyReport(6);
+        setMonthlyFinancials(monthlyData);
+      }
+
     } catch (e) {
       console.error("Failed to fetch report data", e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchExpenses = async () => {
+    setExpenseLoading(true);
+    try {
+      let startDateStr = "";
+      let endDateStr = "";
+      
+      if (selectedPeriod === "today") {
+        const now = new Date();
+        startDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        endDateStr = startDateStr;
+      } else if (selectedPeriod === "custom") {
+        startDateStr = customDate;
+        endDateStr = startDateStr;
+      } else {
+        const now = new Date();
+        const start = new Date();
+        start.setMonth(now.getMonth() - 1);
+        startDateStr = start.toISOString().split("T")[0];
+        endDateStr = now.toISOString().split("T")[0];
+      }
+
+      const data = await ExpenseService.getExpenses(startDateStr, endDateStr);
+      setExpenses(data || []);
+    } catch (e) {
+      toast.error('Failed to load expenses');
+    } finally {
+      setExpenseLoading(false);
+    }
+  };
+
+  const handleAddExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await ExpenseService.createExpense({
+        amount: parseFloat(newExpense.amount),
+        category: newExpense.category,
+        description: newExpense.description,
+        date: newExpense.date
+      });
+      toast.success('Expense recorded');
+      setIsAddExpenseOpen(false);
+      setNewExpense({ amount: '', category: 'Utilities', description: '', date: new Date().toISOString().split('T')[0] });
+      fetchExpenses();
+      fetchData(); // Refresh summary metrics
+    } catch (e) {
+      toast.error('Failed to save expense');
+    }
+  };
+
+  const handleDeleteExpense = async (id: number) => {
+    if (!window.confirm('Are you sure you want to delete this expense?')) return;
+    try {
+      await ExpenseService.deleteExpense(id);
+      toast.success('Expense deleted');
+      fetchExpenses();
+      fetchData();
+    } catch (e) {
+      toast.error('Failed to delete expense');
     }
   };
 
@@ -231,6 +323,15 @@ export default function ReportsPage() {
             >
               <ShieldCheck size={18} />
               Audit Log
+            </button>
+            <button
+               onClick={() => setActiveTab('expenses')}
+               className={`flex items-center gap-2 px-6 py-2 rounded-lg font-bold transition-all ${
+                 activeTab === 'expenses' ? 'bg-white text-blue-600 shadow-sm ring-1 ring-slate-200' : 'text-slate-500'
+               }`}
+            >
+              <Wallet size={18} />
+              Expenses
             </button>
           </div>
         )}
@@ -370,6 +471,154 @@ export default function ReportsPage() {
              </div>
           </div>
         </div>
+      ) : activeTab === 'expenses' ? (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200">
+             <div className="flex items-center gap-3">
+               <div className="p-2 bg-blue-50 rounded-lg">
+                 <Wallet className="text-blue-600" size={20} />
+               </div>
+               <div>
+                 <h3 className="font-bold text-slate-900">Business Expenses</h3>
+                 <p className="text-sm text-slate-500">Track and manage your operational costs</p>
+               </div>
+             </div>
+             <button 
+               onClick={() => setIsAddExpenseOpen(true)}
+               className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold shadow-lg shadow-blue-500/20 hover:bg-blue-700 transition-all flex items-center gap-2"
+             >
+               + Record Expense
+             </button>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-100">
+                    <th className="px-6 py-4 text-xs font-bold uppercase text-slate-400 tracking-wider">Date</th>
+                    <th className="px-6 py-4 text-xs font-bold uppercase text-slate-400 tracking-wider">Category</th>
+                    <th className="px-6 py-4 text-xs font-bold uppercase text-slate-400 tracking-wider">Description</th>
+                    <th className="px-6 py-4 text-xs font-bold uppercase text-slate-400 tracking-wider text-right">Amount</th>
+                    <th className="px-6 py-4 text-xs font-bold uppercase text-slate-400 tracking-wider text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {expenseLoading ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center">
+                        <Loader2 className="animate-spin mx-auto text-blue-600 mb-2" />
+                        <p className="text-slate-500">Loading expenses...</p>
+                      </td>
+                    </tr>
+                  ) : expenses.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
+                        No expenses recorded for this period.
+                      </td>
+                    </tr>
+                  ) : (
+                    expenses.map((exp) => (
+                      <tr key={exp.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-6 py-4 text-sm text-slate-900">{new Date(exp.date).toLocaleDateString()}</td>
+                        <td className="px-6 py-4 text-sm font-medium text-slate-700">
+                          <span className="px-2 py-1 bg-slate-100 rounded text-xs">{exp.category}</span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-slate-600">{exp.description}</td>
+                        <td className="px-6 py-4 text-sm font-bold text-rose-600 text-right">
+                          {formatCurrency(exp.amount, business?.currency)}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <button 
+                            onClick={() => handleDeleteExpense(exp.id)}
+                            className="text-slate-400 hover:text-rose-600 p-1"
+                          >
+                            <AlertCircle size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Add Expense Modal */}
+          {isAddExpenseOpen && (
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-blue-600 text-white">
+                  <h3 className="text-xl font-bold">New Expense</h3>
+                  <button onClick={() => setIsAddExpenseOpen(false)} className="text-white/80 hover:text-white">
+                    <AlertCircle size={24} className="rotate-45" />
+                  </button>
+                </div>
+                <form onSubmit={handleAddExpense} className="p-6 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-500 uppercase">Amount</label>
+                      <input 
+                        type="number" 
+                        required
+                        value={newExpense.amount}
+                        onChange={e => setNewExpense({...newExpense, amount: e.target.value})}
+                        placeholder="0.00"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-lg font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-bold text-slate-500 uppercase">Date</label>
+                      <input 
+                        type="date" 
+                        required
+                        value={newExpense.date}
+                        onChange={e => setNewExpense({...newExpense, date: e.target.value})}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Category</label>
+                    <select 
+                      value={newExpense.category}
+                      onChange={e => setNewExpense({...newExpense, category: e.target.value})}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    >
+                      <option>Utilities</option>
+                      <option>Rent</option>
+                      <option>Salaries</option>
+                      <option>Inventory Purchase</option>
+                      <option>Repairs</option>
+                      <option>Marketing</option>
+                      <option>Tax</option>
+                      <option>Other</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500 uppercase">Description</label>
+                    <textarea 
+                      value={newExpense.description}
+                      onChange={e => setNewExpense({...newExpense, description: e.target.value})}
+                      placeholder="e.g. Paid Electricity Bill"
+                      rows={3}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <button 
+                    type="submit"
+                    className="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg shadow-blue-500/30 hover:bg-blue-700 transition-all active:scale-[0.98]"
+                  >
+                    Save Expense
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
       ) : (
         <>
           {/* Sales Tab Content */}
@@ -439,6 +688,105 @@ export default function ReportsPage() {
                       {formatCurrency(reportData?.card_sales || 0, business?.currency)}
                     </span>
                   </button>
+
+                  <div className="flex flex-col p-4 bg-white rounded-xl border border-slate-200">
+                    <div className="w-10 h-10 rounded-full bg-teal-50 flex items-center justify-center mb-3 text-teal-600">
+                      <TrendingUp size={20} />
+                    </div>
+                    <span className="text-slate-500 text-sm font-medium">Gross Profit</span>
+                    <span className="text-2xl font-bold text-slate-900 mt-1">
+                      {formatCurrency(reportData?.total_profit || 0, business?.currency)}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col p-4 bg-white rounded-xl border border-slate-200">
+                    <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center mb-3 text-rose-600">
+                      <AlertCircle size={20} />
+                    </div>
+                    <span className="text-slate-500 text-sm font-medium">Expenses</span>
+                    <span className="text-2xl font-bold text-slate-900 mt-1">
+                      {formatCurrency((reportData as any)?.total_expenses || 0, business?.currency)}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col p-4 bg-teal-600 border border-teal-700 rounded-xl relative overflow-hidden group shadow-lg shadow-teal-600/20">
+                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
+                       <TrendingUp size={48} className="text-white" />
+                    </div>
+                    <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mb-3 text-white">
+                      <TrendingUp size={20} />
+                    </div>
+                    <span className="text-white/80 text-sm font-medium">Net Profit</span>
+                    <span className="text-2xl font-bold text-white mt-1">
+                      {formatCurrency((reportData as any)?.net_profit || 0, business?.currency)}
+                    </span>
+                    <span className="text-xs text-white/60 mt-1">
+                       After subtracting expenses
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {!isCashier && monthlyFinancials.length > 0 && (
+                <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h3 className="font-bold text-slate-900">Financial Trends</h3>
+                      <p className="text-sm text-slate-500">Revenue vs Profit over the last 6 months</p>
+                    </div>
+                  </div>
+                  <div className="h-[300px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={monthlyFinancials}>
+                        <defs>
+                          <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#0D9488" stopOpacity={0.1}/>
+                            <stop offset="95%" stopColor="#0D9488" stopOpacity={0}/>
+                          </linearGradient>
+                          <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#10B981" stopOpacity={0.3}/>
+                            <stop offset="95%" stopColor="#10B981" stopOpacity={0}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                        <XAxis 
+                          dataKey="month" 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{fill: '#94a3b8', fontSize: 12}}
+                          dy={10}
+                        />
+                        <YAxis 
+                          axisLine={false} 
+                          tickLine={false} 
+                          tick={{fill: '#94a3b8', fontSize: 12}}
+                          tickFormatter={(value) => `${value > 1000 ? (value/1000).toFixed(1)+'k' : value}`}
+                        />
+                        <Tooltip 
+                          contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                        />
+                        <Legend verticalAlign="top" height={36}/>
+                        <Area 
+                          type="monotone" 
+                          dataKey="revenue" 
+                          name="Revenue"
+                          stroke="#0D9488" 
+                          strokeWidth={2}
+                          fillOpacity={1} 
+                          fill="url(#colorRevenue)" 
+                        />
+                        <Area 
+                          type="monotone" 
+                          dataKey="profit" 
+                          name="Net Profit"
+                          stroke="#10B981" 
+                          strokeWidth={3}
+                          fillOpacity={1} 
+                          fill="url(#colorProfit)" 
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
               )}
 
@@ -507,6 +855,37 @@ export default function ReportsPage() {
                       ))
                     )}
                   </div>
+
+                  {!isCashier && productProfitData.length > 0 && (
+                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm mt-6">
+                      <div className="p-4 border-b border-slate-100">
+                        <h3 className="font-bold text-slate-900">Product Performance</h3>
+                        <p className="text-xs text-slate-500">Top products by profitability</p>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-50 border-b border-slate-100 uppercase text-slate-500 font-semibold">
+                            <tr>
+                              <th className="px-4 py-3">Product</th>
+                              <th className="px-4 py-3 text-center">Qty</th>
+                              <th className="px-4 py-3 text-right">Revenue</th>
+                              <th className="px-4 py-3 text-right">Profit</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {productProfitData.slice(0, 8).map((item) => (
+                              <tr key={item.product_id} className="hover:bg-slate-50 transition-colors">
+                                <td className="px-4 py-3 font-medium text-slate-900">{item.product_name}</td>
+                                <td className="px-4 py-3 text-center text-slate-600">{item.total_qty}</td>
+                                <td className="px-4 py-3 text-right text-slate-600">{formatCurrency(item.revenue, business?.currency)}</td>
+                                <td className="px-4 py-3 text-right font-bold text-teal-600">{formatCurrency(item.profit, business?.currency)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {!isCashier && (
@@ -535,8 +914,14 @@ export default function ReportsPage() {
                     </div>
 
                     <div className="bg-white rounded-xl border border-slate-200 p-5">
-                      <h3 className="font-bold text-slate-900 mb-4">Additional Metrics</h3>
+                      <h3 className="font-bold text-slate-900 mb-4">Financial Breakdown</h3>
                       <div className="space-y-3">
+                        <div className="flex justify-between items-center p-2 rounded-lg hover:bg-slate-50">
+                          <span className="text-slate-500 text-sm">Cost of Goods</span>
+                          <span className="font-mono font-medium text-slate-900">
+                            {formatCurrency(reportData?.total_cost || 0, business?.currency)}
+                          </span>
+                        </div>
                         <div className="flex justify-between items-center p-2 rounded-lg hover:bg-slate-50">
                           <span className="text-slate-500 text-sm">Transfer Sales</span>
                           <span className="font-mono font-medium text-slate-900">

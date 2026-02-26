@@ -19,13 +19,16 @@ import {
   ChefHat,
   Shield,
   Lightbulb,
-  ChevronRight
+  ChevronRight,
+  AlertCircle
 } from 'lucide-react';
 import { cn, formatCurrency } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import { ReportService, type DailyReport } from '../../services/report.service';
+import { ProductService } from '../../services/product.service';
 import { RolePermissions, UserRole } from '../../constants/roles';
+import { Product } from '../../types/pos';
 import Link from 'next/link';
 import TrialChecklist from '../../components/dashboard/TrialChecklist';
 
@@ -33,6 +36,7 @@ export default function DashboardPage() {
   const { business, user } = useAuth();
   const { hasModule } = useSubscription();
   const [reportData, setReportData] = useState<DailyReport | null>(null);
+  const [lowStockProducts, setLowStockProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
 
   const userRole = (user?.role || "cashier").toLowerCase() as UserRole;
@@ -49,6 +53,11 @@ export default function DashboardPage() {
     try {
       const data = await ReportService.getDailyReport();
       setReportData(data);
+
+      if (permissions.canManageInventory) {
+        const lowStock = await ProductService.getLowStockProducts();
+        setLowStockProducts(lowStock.slice(0, 5)); // Just show top 5 on dashboard
+      }
     } catch (e) {
       console.error("Failed to fetch dashboard metrics", e);
     } finally {
@@ -225,6 +234,22 @@ export default function DashboardPage() {
               </h3>
             </div>
           </div>
+
+          <div className="bg-white p-6 rounded-2xl border border-teal-100 bg-teal-50/10 shadow-sm flex items-center gap-4 transition-all hover:shadow-md">
+            <div className="w-12 h-12 bg-teal-100 text-teal-600 rounded-xl flex items-center justify-center">
+              <TrendingUp size={24} />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-teal-600 uppercase tracking-wider">Profit Today</p>
+              <h3 className="text-xl font-extrabold text-teal-900 mt-0.5">
+                {loading ? (
+                  <div className="h-6 w-20 bg-slate-100 animate-pulse rounded" />
+                ) : (
+                  formatCurrency(reportData?.total_profit || 0, business?.currency)
+                )}
+              </h3>
+            </div>
+          </div>
         </div>
       )}
 
@@ -256,6 +281,49 @@ export default function DashboardPage() {
           {/* Abstract background graphics */}
           <div className="absolute right-0 top-0 w-64 h-64 bg-white/10 rounded-full translate-x-24 -translate-y-24 blur-3xl" />
           <div className="absolute left-1/4 bottom-0 w-32 h-32 bg-teal-400/20 rounded-full translate-y-16 blur-2xl" />
+        </div>
+      )}
+
+      {/* Low Stock Alerts */}
+      {permissions.canManageInventory && lowStockProducts.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center">
+                <AlertCircle size={20} />
+              </div>
+              <div>
+                <h2 className="font-bold text-slate-900">Low Stock Alerts</h2>
+                <p className="text-xs text-slate-500">{lowStockProducts.length} items running low</p>
+              </div>
+            </div>
+            <Link 
+              href="/dashboard/inventory"
+              className="text-xs font-bold text-amber-700 hover:underline"
+            >
+              View All Inventory
+            </Link>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            {lowStockProducts.map(product => (
+              <div key={product.id} className="bg-white p-4 rounded-xl border border-amber-100 flex flex-col justify-between">
+                <div>
+                  <h4 className="font-bold text-slate-800 text-sm truncate">{product.name}</h4>
+                  <p className="text-[10px] text-slate-500 uppercase font-medium">{product.sku}</p>
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Current</span>
+                    <span className="text-sm font-black text-rose-600">{product.stock}</span>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Min Level</span>
+                    <span className="text-xs font-bold text-slate-600">{product.min_stock}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

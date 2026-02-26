@@ -28,6 +28,7 @@ export default function InventoryPage() {
   const { business } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [summary, setSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -43,6 +44,7 @@ export default function InventoryPage() {
   const [formData, setFormData] = useState({
     name: '',
     price: '',
+    cost: '',
     stock: '',
     categoryId: '',
     minStockLevel: ''
@@ -57,12 +59,14 @@ export default function InventoryPage() {
 
   const fetchData = async () => {
     try {
-      const [productsData, categoriesData] = await Promise.all([
+      const [productsData, categoriesData, summaryData] = await Promise.all([
         ProductService.getProducts(),
-        ProductService.getCategories()
+        ProductService.getCategories(),
+        ProductService.getInventorySummary()
       ]);
       setProducts(productsData);
       setCategories(categoriesData);
+      setSummary(summaryData);
     } catch (error) {
       toast.error('Failed to load inventory');
     } finally {
@@ -76,14 +80,15 @@ export default function InventoryPage() {
       setFormData({
         name: product.name,
         price: product.price.toString(),
+        cost: (product.cost || 0).toString(),
         stock: product.stock.toString(),
         categoryId: product.category_id.toString(),
-        minStockLevel: (product.min_stock_level || 0).toString()
+        minStockLevel: (product.min_stock || 0).toString()
       });
       setImagePreview(product.image_url || null);
     } else {
       setEditingProduct(null);
-      setFormData({ name: '', price: '', stock: '', categoryId: '', minStockLevel: '' });
+      setFormData({ name: '', price: '', cost: '', stock: '', categoryId: '', minStockLevel: '' });
       setImagePreview(null);
     }
     setImageFile(null);
@@ -110,9 +115,10 @@ export default function InventoryPage() {
       const data = new FormData();
       data.append('name', formData.name);
       data.append('price', formData.price);
+      data.append('cost', formData.cost);
       data.append('stock', formData.stock);
       data.append('category_id', formData.categoryId);
-      if (formData.minStockLevel) data.append('min_stock_level', formData.minStockLevel);
+      if (formData.minStockLevel) data.append('min_stock', formData.minStockLevel);
       
       if (imageFile) {
         data.append('image', imageFile);
@@ -179,6 +185,32 @@ export default function InventoryPage() {
             <Plus size={20} />
             Add Product
           </button>
+        </div>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <p className="text-slate-500 text-sm font-medium">Total Products</p>
+          <h3 className="text-2xl font-bold text-slate-900 mt-1">{summary?.total_items || 0}</h3>
+        </div>
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <p className="text-slate-500 text-sm font-medium">Stock Worth (Cost)</p>
+          <h3 className="text-2xl font-bold text-slate-900 mt-1">
+            {formatCurrency(summary?.total_purchase_cost || 0, business?.currency)}
+          </h3>
+        </div>
+        <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <p className="text-slate-500 text-sm font-medium">Stock Value (Retail)</p>
+          <h3 className="text-2xl font-bold text-slate-900 mt-1">
+            {formatCurrency(summary?.total_selling_value || 0, business?.currency)}
+          </h3>
+        </div>
+        <div className="bg-white p-6 rounded-2xl border border-teal-100 bg-teal-50/30 shadow-sm">
+          <p className="text-teal-600 text-sm font-medium">Potential Profit</p>
+          <h3 className="text-2xl font-bold text-teal-700 mt-1">
+            {formatCurrency(summary?.potential_profit || 0, business?.currency)}
+          </h3>
         </div>
       </div>
 
@@ -359,26 +391,51 @@ export default function InventoryPage() {
 
                       <div className="grid grid-cols-2 gap-4">
                          <div>
-                            <label className="block text-sm font-medium text-slate-700 mb-1">Price</label>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Selling Price</label>
                             <input 
-                              type="number"
-                              value={formData.price}
-                              onChange={(e) => setFormData({...formData, price: e.target.value})}
-                              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-slate-900 placeholder:text-slate-400"
-                              placeholder="0.00"
-                              step="0.01"
-                              required
+                               type="number"
+                               value={formData.price}
+                               onChange={(e) => setFormData({...formData, price: e.target.value})}
+                               className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-slate-900 placeholder:text-slate-400"
+                               placeholder="0.00"
+                               step="0.01"
+                               required
                             />
                          </div>
                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Purchase Cost</label>
+                            <input 
+                               type="number"
+                               value={formData.cost}
+                               onChange={(e) => setFormData({...formData, cost: e.target.value})}
+                               className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-slate-900 placeholder:text-slate-400"
+                               placeholder="0.00"
+                               step="0.01"
+                               required
+                            />
+                         </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-1">Stock Quantity</label>
                             <input 
-                              type="number"
-                              value={formData.stock}
-                              onChange={(e) => setFormData({...formData, stock: e.target.value})}
-                              className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-slate-900 placeholder:text-slate-400"
-                              placeholder="0"
-                              required
+                               type="number"
+                               value={formData.stock}
+                               onChange={(e) => setFormData({...formData, stock: e.target.value})}
+                               className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-slate-900 placeholder:text-slate-400"
+                               placeholder="0"
+                               required
+                            />
+                         </div>
+                         <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">Min. Stock Level</label>
+                            <input 
+                               type="number"
+                               value={formData.minStockLevel}
+                               onChange={(e) => setFormData({...formData, minStockLevel: e.target.value})}
+                               className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-slate-900 placeholder:text-slate-400"
+                               placeholder="0"
                             />
                          </div>
                       </div>
