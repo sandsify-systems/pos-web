@@ -92,6 +92,8 @@ export default function CheckoutPage() {
   const [isVerifyingPromo, setIsVerifyingPromo] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState(0);
   const [appliedPromo, setAppliedPromo] = useState<string | null>(null);
+  
+  const [launchOffer, setLaunchOffer] = useState<{ eligible: boolean, discount: number } | null>(null);
 
   // Initialize from previous subscription if available
   useEffect(() => {
@@ -106,6 +108,33 @@ export default function CheckoutPage() {
        else setBillingCycle('MONTHLY');
     }
   }, [activeModules, subscription]);
+
+  // Check Launch Offer Eligibility
+  useEffect(() => {
+    const checkEligibility = async () => {
+        try {
+            const planType = business?.type === 'SERVICE' ? `SERVICE_${billingCycle}` : billingCycle;
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/subscription/promo/launch-eligibility?plan_type=${planType}`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+            const data = await res.json();
+            if (data.eligible) {
+                setLaunchOffer({ eligible: true, discount: data.discount_percentage });
+            } else {
+                setLaunchOffer(null);
+            }
+        } catch (e) {
+            console.error('Launch eligibility check failed');
+        }
+    };
+    if (business && (billingCycle === 'QUARTERLY' || billingCycle === 'ANNUAL')) {
+        checkEligibility();
+    } else {
+        setLaunchOffer(null);
+    }
+  }, [billingCycle, business]);
 
   // Redirect if fully active
   useEffect(() => {
@@ -176,6 +205,10 @@ export default function CheckoutPage() {
       finalTotal = finalTotal * (1 - promoDiscount / 100);
     }
 
+    if (launchOffer?.eligible && !isProratedAddon) {
+        finalTotal = finalTotal * (1 - launchOffer.discount / 100);
+    }
+
     const savings = originalTotal - finalTotal;
 
     return {
@@ -186,7 +219,7 @@ export default function CheckoutPage() {
         isProratedAddon,
         newModulesCount: newModules.length
     };
-  }, [billingCycle, selectedModules, plans, availableModules, business?.type, isSubscribed, subscription, promoDiscount]);
+  }, [billingCycle, selectedModules, plans, availableModules, business?.type, isSubscribed, subscription, promoDiscount, launchOffer]);
 
   const handlePay = () => {
     if (!user || !business) {
@@ -475,10 +508,18 @@ export default function CheckoutPage() {
                  <div className="flex justify-between items-end">
                     <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Total</p>
                     <div className="text-right">
-                        {savings > 0 && (
-                            <div className="flex items-center justify-end gap-2 mb-1">
-                                <span className="text-[10px] font-bold text-slate-300 line-through">{formatCurrency(originalTotal)}</span>
-                                <span className="bg-emerald-50 text-emerald-600 text-[9px] font-black px-1.5 py-0.5 rounded-md border border-emerald-100">-{discountPercent}%</span>
+                        {(savings > 0 || launchOffer?.eligible) && (
+                            <div className="flex flex-col items-end gap-1 mb-2">
+                                {launchOffer?.eligible && (
+                                    <div className="flex items-center gap-2 px-3 py-1 bg-amber-50 text-amber-600 rounded-lg border border-amber-100">
+                                        <Sparkles size={12} className="animate-pulse" />
+                                        <span className="text-[10px] font-black uppercase tracking-wider">Launch Offer Activated</span>
+                                    </div>
+                                )}
+                                <div className="flex items-center justify-end gap-2">
+                                    <span className="text-[10px] font-bold text-slate-300 line-through">{formatCurrency(originalTotal)}</span>
+                                    <span className="bg-emerald-50 text-emerald-600 text-[9px] font-black px-1.5 py-0.5 rounded-md border border-emerald-100">-{discountPercent}%</span>
+                                </div>
                             </div>
                         )}
                         <h2 className="text-3xl font-black text-teal-600 tracking-tighter">
