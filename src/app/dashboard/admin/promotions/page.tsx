@@ -55,10 +55,16 @@ export default function PromotionsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const payload = {
+        ...form,
+        start_date: new Date(form.start_date).toISOString(),
+        end_date: new Date(form.end_date).toISOString(),
+      };
+
       if (selectedPromo) {
-        await AdminService.updateGlobalPromotion(selectedPromo.id, form as any);
+        await AdminService.updateGlobalPromotion(selectedPromo.id, payload as any);
       } else {
-        await AdminService.createGlobalPromotion(form as any);
+        await AdminService.createGlobalPromotion(payload as any);
       }
       setShowModal(false);
       setSelectedPromo(null);
