@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AuthService } from '@/services/auth.service';
+import { SubscriptionService } from '@/services/subscription.service';
 
 const BUSINESS_TYPE_MODULES: Record<string, { recommended: string[], visible: string[] }> = {
   RESTAURANT: {
@@ -132,24 +133,36 @@ function RegisterForm() {
 
   const [availableModules, setAvailableModules] = useState<any[]>(FALLBACK_PRICING.modules);
   const [availablePlans, setAvailablePlans] = useState<any[]>(FALLBACK_PRICING.plans);
+  const [activePromotion, setActivePromotion] = useState<any>(null);
   const [showAdvancedModules, setShowAdvancedModules] = useState(false);
 
   useEffect(() => {
     // Fetch public pricing
-    const fetchPricing = async () => {
+    const fetchData = async () => {
       try {
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://betadaypos.onrender.com/api/v1';
         const cleanBaseUrl = baseUrl.endsWith('/api/v1') ? baseUrl : `${baseUrl}/api/v1`;
         
-        const res = await fetch(`${cleanBaseUrl}/pricing`); 
-        const data = await res.json();
-        setAvailableModules(data.modules || []);
-        setAvailablePlans(data.plans || []);
+        const [priceRes, promoRes] = await Promise.all([
+          fetch(`${cleanBaseUrl}/pricing`),
+          fetch(`${cleanBaseUrl}/active-promotion`)
+        ]);
+
+        if (priceRes.ok) {
+           const data = await priceRes.json();
+           setAvailableModules(data.modules || []);
+           setAvailablePlans(data.plans || []);
+        }
+
+        if (promoRes.ok) {
+           const promo = await promoRes.json();
+           setActivePromotion(promo);
+        }
       } catch (e) {
-        console.error('Failed to fetch pricing', e);
+        console.error('Failed to fetch public data', e);
       }
     };
-    fetchPricing();
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -260,7 +273,15 @@ function RegisterForm() {
   const calculateTotalForCycle = (cycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL') => {
     let total = 0;
     const multiplier = cycle === 'ANNUAL' ? 12 : cycle === 'QUARTERLY' ? 3 : 1;
-    const discount = cycle === 'ANNUAL' ? 0.85 : cycle === 'QUARTERLY' ? 0.9 : 1;
+    
+    // Default system discounts (10% quarterly, 15% annual)
+    let discount = cycle === 'ANNUAL' ? 0.85 : cycle === 'QUARTERLY' ? 0.9 : 1;
+
+    // Apply Global Promotion if active
+    if (activePromotion) {
+      if (cycle === 'QUARTERLY') discount = (100 - activePromotion.quarterly_discount) / 100;
+      else if (cycle === 'ANNUAL') discount = (100 - activePromotion.annual_discount) / 100;
+    }
 
     // 1. Base Plan Price
     let targetPlanType = formData.base_plan_type;
@@ -318,6 +339,32 @@ function RegisterForm() {
               style={{ width: `${(step / 5) * 100}%` }}
             />
           </div>
+
+          {/* Active Promo Banner */}
+          {activePromotion && (
+            <div className="bg-teal-600 -mx-8 md:-mx-14 -mt-8 md:-mt-14 mb-8 p-4 md:p-6 text-white flex flex-col md:flex-row items-center justify-between gap-4 animate-in slide-in-from-top duration-500">
+               <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center animate-pulse">
+                     <Zap size={20} className="fill-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black uppercase tracking-widest">{activePromotion.name}</h3>
+                    <p className="text-xs text-teal-100 font-medium">{activePromotion.description}</p>
+                  </div>
+               </div>
+               <div className="flex items-center gap-3 bg-white/10 px-4 py-2 rounded-2xl border border-white/20">
+                  <div className="text-center">
+                    <p className="text-[10px] font-black opacity-60">QUARTERLY</p>
+                    <p className="text-sm font-black">-{activePromotion.quarterly_discount}%</p>
+                  </div>
+                  <div className="w-px h-8 bg-white/20" />
+                  <div className="text-center">
+                    <p className="text-[10px] font-black opacity-60">ANNUAL</p>
+                    <p className="text-sm font-black">-{activePromotion.annual_discount}%</p>
+                  </div>
+               </div>
+            </div>
+          )}
 
           <div className="text-center space-y-3">
              <div className="inline-flex items-center gap-2 px-4 py-2 bg-teal-50 text-teal-700 rounded-full text-xs font-black uppercase tracking-widest mb-2 animate-bounce">

@@ -80,6 +80,11 @@ export const SubscriptionService = {
     return response.data;
   },
 
+  getActivePromotion: async (): Promise<any> => {
+    const response = await apiClient.get('/subscription/active-promotion');
+    return response.data;
+  },
+
   getStatus: async (): Promise<Subscription | { status: "NONE" }> => {
     const response = await apiClient.get('/subscription/status');
     return response.data;
