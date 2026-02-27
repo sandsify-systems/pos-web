@@ -136,14 +136,14 @@ export default function PromotionsPage() {
                 <Tag size={24} />
             </div>
             <p className="text-slate-500 text-sm font-bold uppercase tracking-wider">Active Offers</p>
-            <h3 className="text-4xl font-black text-slate-900">{promotions.filter(p => p.is_active).length}</h3>
+            <h3 className="text-4xl font-black text-slate-900">{(promotions || []).filter(p => p.is_active).length}</h3>
         </div>
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-2">
             <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center">
                 <Users size={24} />
             </div>
             <p className="text-slate-500 text-sm font-bold uppercase tracking-wider">Total Usage</p>
-            <h3 className="text-4xl font-black text-slate-900">{usage.length}</h3>
+            <h3 className="text-4xl font-black text-slate-900">{(usage || []).length}</h3>
         </div>
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-2">
             <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center">
@@ -151,7 +151,7 @@ export default function PromotionsPage() {
             </div>
             <p className="text-slate-500 text-sm font-bold uppercase tracking-wider">Impacted Revenue</p>
             <h3 className="text-4xl font-black text-slate-900">
-                {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format(usage.reduce((sum, u) => sum + u.amount_paid, 0))}
+                {new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format((usage || []).reduce((sum, u) => sum + u.amount_paid, 0))}
             </h3>
         </div>
       </div>
@@ -265,7 +265,7 @@ export default function PromotionsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {usage.map((u, i) => (
+              {(usage || []).map((u, i) => (
                 <tr key={i} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4">
                     <p className="font-black text-slate-900">{u.business_name}</p>
@@ -284,7 +284,7 @@ export default function PromotionsPage() {
                   </td>
                 </tr>
               ))}
-              {usage.length === 0 && (
+              {(usage || []).length === 0 && (
                 <tr>
                    <td colSpan={4} className="py-20 text-center text-slate-400 font-bold">No active benefit usage detected in the system yet.</td>
                 </tr>
