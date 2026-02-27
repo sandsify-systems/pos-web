@@ -35,6 +35,26 @@ export interface SubscriptionWithBusiness {
   business_name: string;
 }
 
+export interface GlobalPromotion {
+  id: number;
+  name: string;
+  description: string;
+  start_date: string;
+  end_date: string;
+  quarterly_discount: number;
+  annual_discount: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface PromoUsage {
+  business_name: string;
+  tenant_id: string;
+  plan_type: string;
+  amount_paid: number;
+  created_at: string;
+}
+
 export const AdminService = {
   // Subscriptions
   getAllSubscriptions: async (): Promise<SubscriptionWithBusiness[]> => {
@@ -146,6 +166,27 @@ export const AdminService = {
     amount: number;
   }): Promise<any> => {
     const response = await apiClient.post('/admin/subscriptions/renew', data);
+    return response.data;
+  },
+
+  // Global Promotions
+  getGlobalPromotions: async (): Promise<GlobalPromotion[]> => {
+    const response = await apiClient.get('/admin/promotions');
+    return response.data;
+  },
+
+  createGlobalPromotion: async (data: Partial<GlobalPromotion>): Promise<GlobalPromotion> => {
+    const response = await apiClient.post('/admin/promotions', data);
+    return response.data;
+  },
+
+  updateGlobalPromotion: async (id: number, data: Partial<GlobalPromotion>): Promise<GlobalPromotion> => {
+    const response = await apiClient.put(`/admin/promotions/${id}`, data);
+    return response.data;
+  },
+
+  getGlobalPromotionUsage: async (): Promise<PromoUsage[]> => {
+    const response = await apiClient.get('/admin/promotions/usage');
     return response.data;
   },
 };

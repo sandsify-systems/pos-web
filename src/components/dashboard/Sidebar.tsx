@@ -34,6 +34,7 @@ const menuItems = [
   { icon: CreditCard, label: 'Subscriptions', href: '/dashboard/admin/subscriptions', roles: ['super_admin'] },
   { icon: Shield, label: 'Commissions', href: '/dashboard/admin/commissions', roles: ['super_admin'] },
   { icon: Users, label: 'Affiliates', href: '/dashboard/admin/affiliates', roles: ['super_admin'] },
+  { icon: ShieldCheck, label: 'Promotions', href: '/dashboard/admin/promotions', roles: ['super_admin'] },
   { icon: BookOpen, label: 'Training', href: '/dashboard/admin/training', roles: ['super_admin'] },
 
   // Installer Navigation
