@@ -61,6 +61,7 @@ export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ 
         start_date: new Date().toISOString(),
         end_date: new Date(2099, 11, 31).toISOString(),
         amount_paid: 0,
+        description:  "",
         payment_method: 'ADMIN',
         transaction_reference: 'SUPER_ADMIN_ACCESS',
         created_at: new Date().toISOString(),
