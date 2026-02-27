@@ -37,6 +37,7 @@ import { ShiftService } from '@/services/shift.service';
 import { SalesService } from '@/services/sales.service';
 import { formatCurrency, cn } from '@/lib/utils';
 import { Product, Category } from '@/types/pos';
+import { GasSaleModal } from '@/components/dashboard/GasSaleModal';
 
 export default function POSPage() {
   const router = useRouter();
@@ -55,6 +56,11 @@ export default function POSPage() {
   const [startCash, setStartCash] = useState('');
   const [endCash, setEndCash] = useState('');
   const [shiftNotes, setShiftNotes] = useState('');
+  const [pumpReading, setPumpReading] = useState('');
+  
+  // Gas Sale Modal
+  const [showGasModal, setShowGasModal] = useState(false);
+  const [selectedGasProduct, setSelectedGasProduct] = useState<Product | null>(null);
   
   // Drafts state
   const [showDraftsModal, setShowDraftsModal] = useState(false);
@@ -97,12 +103,41 @@ export default function POSPage() {
     });
   }, [products, selectedCategory, searchQuery]);
 
-  // Handle Shift Requirement
+  // Handle Shift Requirement & Staleness
+  const isStaleShift = useMemo(() => {
+    if (!activeShift) return false;
+    const isLPG = business?.type === 'LPG_STATION' || business?.type === 'FUEL_STATION';
+    if (!isLPG) return false;
+    const shiftStart = new Date(activeShift.start_time).setHours(0, 0, 0, 0);
+    const today = new Date().setHours(0, 0, 0, 0);
+    return shiftStart < today;
+  }, [activeShift, business]);
+
   useEffect(() => {
-    if (!loading && !activeShift) {
-      setShowShiftModal(true);
+    if (!loading) {
+      if (!activeShift) {
+        setShowShiftModal(true);
+      } else if (isStaleShift) {
+        setShowEndShiftModal(true);
+      }
     }
-  }, [loading, activeShift]);
+  }, [loading, activeShift, isStaleShift]);
+
+  const handleProductClick = (product: Product) => {
+    const isGasBaseProduct = 
+      product.track_by_round ||
+      product?.sku?.startsWith("GAS") || product?.sku?.includes("GAS-UNIT") || 
+      product?.name?.toLowerCase().includes("(bulk)") || product?.name?.toLowerCase().includes("gas refill");
+    
+    const isLPGStation = business?.type === "LPG_STATION" || business?.type === "FUEL_STATION";
+
+    if (isLPGStation && isGasBaseProduct) {
+      setSelectedGasProduct(product);
+      setShowGasModal(true);
+    } else {
+      addItem(product);
+    }
+  };
 
   const handleStartShift = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,11 +157,27 @@ export default function POSPage() {
   const handleEndShift = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeShift) return;
+    
+    // Validate readings for LPG
+    const isLPG = business?.type === 'LPG_STATION' || business?.type === 'FUEL_STATION';
+    if (isLPG && !pumpReading) {
+      toast.error('Meter reading is required for this business type');
+      return;
+    }
+
     setIsProcessing(true);
     try {
-      await ShiftService.endShift(activeShift.id, parseFloat(endCash) || 0, shiftNotes);
+      let readings = undefined;
+      if (isLPG && pumpReading) {
+        readings = [{ product_id: 1, closing_value: parseFloat(pumpReading) }];
+      }
+
+      await ShiftService.endShift(activeShift.id, parseFloat(endCash) || 0, readings, shiftNotes);
       await checkActiveShift(); // Refresh context
       setShowEndShiftModal(false);
+      setEndCash('');
+      setPumpReading('');
+      setShiftNotes('');
       toast.success('Shift closed successfully');
       router.push('/dashboard');
     } catch (error: any) {
@@ -394,10 +445,28 @@ export default function POSPage() {
               <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
                 <LogOut size={32} />
               </div>
-              <h2 className="text-2xl font-bold text-slate-900">Close Your Shift</h2>
-              <p className="text-slate-500 mt-2">Enter the final cash amount at your register.</p>
+              <h2 className="text-2xl font-bold text-slate-900">
+                {isStaleShift ? 'Action Required: Close Stale Shift' : 'Close Your Shift'}
+              </h2>
+              <p className="text-slate-500 mt-2">
+                {isStaleShift 
+                  ? 'You have an unclosed shift from a previous day. Please close it and record meter readings before starting today\'s work.'
+                  : 'Enter the final cash amount at your register.'}
+              </p>
             </div>
             
+            {isStaleShift && (
+              <div className="bg-rose-50 border border-rose-100 p-4 rounded-xl flex items-start gap-3">
+                 <div className="p-1 bg-rose-500 rounded-full text-white mt-0.5">
+                   <Clock size={12} />
+                 </div>
+                 <div className="text-xs text-rose-700 leading-relaxed font-medium">
+                   This shift started on <b>{new Date(activeShift.start_time).toLocaleDateString()}</b>. 
+                   Closing it now ensures accurate daily inventory and variance reporting.
+                 </div>
+              </div>
+            )}
+
             <div className="bg-slate-50 p-4 rounded-xl space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-slate-500">Expected Cash:</span>
@@ -407,6 +476,21 @@ export default function POSPage() {
             </div>
 
             <form onSubmit={handleEndShift} className="space-y-4">
+              {(business?.type === 'LPG_STATION' || business?.type === 'FUEL_STATION') && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Final Pump/Meter Reading</label>
+                  <input
+                    type="number"
+                    value={pumpReading}
+                    onChange={(e) => setPumpReading(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:outline-none focus:border-teal-500 font-bold text-lg text-teal-900"
+                    placeholder="Enter meter reading"
+                    step="0.01"
+                    required
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Actual Cash in Drawer</label>
                 <div className="relative">
@@ -436,14 +520,16 @@ export default function POSPage() {
               </div>
 
               <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowEndShiftModal(false)}
-                  className="flex-1 py-3 px-4 rounded-xl border border-slate-200 font-medium text-slate-600 hover:bg-slate-50"
-                  disabled={isProcessing}
-                >
-                  Cancel
-                </button>
+                {!isStaleShift && (
+                  <button
+                    type="button"
+                    onClick={() => setShowEndShiftModal(false)}
+                    className="flex-1 py-3 px-4 rounded-xl border border-slate-200 font-medium text-slate-600 hover:bg-slate-50"
+                    disabled={isProcessing}
+                  >
+                    Cancel
+                  </button>
+                )}
                 <button
                   type="submit"
                   disabled={isProcessing}
@@ -593,7 +679,7 @@ export default function POSPage() {
                 {filteredProducts.map((product) => (
                   <button
                     key={product.id}
-                    onClick={() => addItem(product)}
+                    onClick={() => handleProductClick(product)}
                     disabled={product.stock <= 0}
                     className={cn(
                       "flex flex-col bg-white rounded-lg border border-slate-200 overflow-hidden hover:shadow-md hover:border-teal-500/50 transition-all text-left group relative",
@@ -670,28 +756,35 @@ export default function POSPage() {
           </div>
 
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {items.map((item) => (
-              <div key={item.product.id} className="flex gap-2 p-2 bg-white border border-slate-100 rounded-lg shadow-sm">
-                <div className="w-8 h-8 bg-slate-50 rounded flex items-center justify-center shrink-0 text-[10px] font-bold text-slate-400">
-                  {item.quantity}x
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold text-slate-900 text-[11px] truncate">{item.product.name}</h4>
-                  <div className="flex justify-between items-center mt-1">
-                    <span className="text-[10px] font-bold text-slate-800">
-                      {formatCurrency(item.product.price * item.quantity, business?.currency)}
-                    </span>
-                    {checkoutView === 'products' && (
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => updateQuantity(item.product.id, item.quantity - 1)} className="w-4 h-4 rounded bg-slate-100 flex items-center justify-center text-slate-500"><Minus size={10}/></button>
-                        <span className="text-[10px] w-4 text-center">{item.quantity}</span>
-                        <button onClick={() => updateQuantity(item.product.id, item.quantity + 1)} className="w-4 h-4 rounded bg-slate-100 flex items-center justify-center text-slate-500"><Plus size={10}/></button>
-                      </div>
-                    )}
+            {items.map((item) => {
+              const isBulk = item.product.track_by_round;
+              return (
+                <div key={item.product.id} className="flex gap-2 p-2 bg-white border border-slate-100 rounded-lg shadow-sm">
+                  <div className="w-10 h-10 bg-slate-50 rounded flex items-center justify-center shrink-0 text-[10px] font-bold text-slate-400">
+                    {isBulk ? `${item.quantity} KG` : `${item.quantity}x`}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold text-slate-900 text-[11px] truncate">{item.product.name}</h4>
+                    <div className="flex justify-between items-center mt-1">
+                      <span className="text-[10px] font-bold text-slate-800">
+                        {formatCurrency(item.product.price * item.quantity, business?.currency)}
+                      </span>
+                      {checkoutView === 'products' && (
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => updateQuantity(item.product.id, item.quantity - 1)} className="w-4 h-4 rounded bg-slate-100 flex items-center justify-center text-slate-500">
+                            <Minus size={10}/>
+                          </button>
+                          <span className="text-[10px] w-8 text-center">{item.quantity}{isBulk ? 'kg' : ''}</span>
+                          <button onClick={() => updateQuantity(item.product.id, item.quantity + 1)} className="w-4 h-4 rounded bg-slate-100 flex items-center justify-center text-slate-500">
+                            <Plus size={10}/>
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="p-3 bg-slate-50 border-t border-slate-100 space-y-2">
@@ -817,6 +910,24 @@ export default function POSPage() {
         </div>
 
       </div>
+      {/* Gas Sale Modal */}
+      {selectedGasProduct && (
+        <GasSaleModal
+          isOpen={showGasModal}
+          onClose={() => {
+            setShowGasModal(false);
+            setSelectedGasProduct(null);
+          }}
+          onAddToCart={(kgQty, perKgPrice) => addItem({
+            ...selectedGasProduct,
+            price: perKgPrice
+          }, kgQty)}
+          productName={selectedGasProduct.name}
+          pricePerKg={selectedGasProduct.price}
+          availableStock={selectedGasProduct.stock}
+          currency={business?.currency}
+        />
+      )}
     </div>
   );
 }

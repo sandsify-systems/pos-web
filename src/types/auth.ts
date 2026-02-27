@@ -14,6 +14,7 @@ export interface User {
 export interface Business {
   id: string;
   name: string;
+  slug: string;
   type: string;
   currency: string;
   tenant_id: string;
@@ -26,6 +27,7 @@ export interface Business {
   active_modules?: string[];
   table_management_enabled?: boolean;
   save_to_draft_enabled?: boolean;
+  default_promo_code?: string;
 }
 
 export interface AuthResponse {

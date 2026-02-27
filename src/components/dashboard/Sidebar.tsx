@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, 
   ShoppingCart, 
@@ -19,7 +19,8 @@ import {
   Shield,
   CreditCard,
   BookOpen,
-  ShieldCheck
+  ShieldCheck,
+  QrCode
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
@@ -32,6 +33,7 @@ const menuItems = [
   { icon: Store, label: 'Businesses', href: '/dashboard/admin/businesses', roles: ['super_admin'] },
   { icon: CreditCard, label: 'Subscriptions', href: '/dashboard/admin/subscriptions', roles: ['super_admin'] },
   { icon: Shield, label: 'Commissions', href: '/dashboard/admin/commissions', roles: ['super_admin'] },
+  { icon: Users, label: 'Affiliates', href: '/dashboard/admin/affiliates', roles: ['super_admin'] },
   { icon: BookOpen, label: 'Training', href: '/dashboard/admin/training', roles: ['super_admin'] },
 
   // Installer Navigation
@@ -43,7 +45,18 @@ const menuItems = [
   { icon: ChefHat, label: 'Real-time Monitor', href: '/dashboard/kds', roles: ['owner', 'admin', 'manager', 'kitchen'], requiresModule: 'KITCHEN_DISPLAY' },
   { icon: Package, label: 'Inventory', href: '/dashboard/inventory', roles: ['owner', 'admin', 'manager'] },
   { icon: BarChart3, label: 'Reports', href: '/dashboard/reports', roles: ['owner', 'admin', 'manager'] },
+  { 
+    icon: CreditCard, 
+    label: 'Subscription', 
+    href: '/dashboard/subscription', 
+    roles: ['owner', 'admin', 'manager'],
+    subItems: [
+      { label: 'Manage & Renew', href: '/dashboard/subscription' },
+      { label: 'Payment History', href: '/dashboard/subscription/history' },
+    ]
+  },
   { icon: ShieldCheck, label: 'Compliance', href: '/dashboard/compliance', roles: ['owner', 'admin', 'manager'], requiresModule: 'AUTOMATED_COMPLIANCE' },
+  { icon: QrCode, label: 'QR Digital Menu', href: '/dashboard/qr-menu', roles: ['owner', 'admin', 'manager'], requiresModule: 'DIGITAL_MENU_QR' },
   { icon: Users, label: 'Staff', href: '/dashboard/staff', roles: ['owner', 'admin', 'manager'] },
   { icon: BookOpen, label: 'How It Works', href: '/dashboard/how-it-works', roles: ['owner', 'admin', 'manager', 'cashier'] },
   { icon: Settings, label: 'Settings', href: '/dashboard/settings', roles: ['owner', 'admin', 'manager'] },
@@ -55,6 +68,29 @@ export function Sidebar() {
   const { hasModule, subscription, daysRemaining } = useSubscription();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [openMenus, setOpenMenus] = useState<string[]>([]);
+  const router = useRouter();
+
+  // Auto-expand current active menu
+  useEffect(() => {
+    const activeItem = menuItems.find(item => 
+      pathname.startsWith(item.href) && (item as any).subItems
+    );
+    if (activeItem && !openMenus.includes(activeItem.label)) {
+      setOpenMenus(prev => [...prev, activeItem.label]);
+    }
+  }, [pathname]);
+
+  const toggleMenu = (label: string, e: React.MouseEvent) => {
+    if (isCollapsed) {
+       setIsCollapsed(false);
+       if (!openMenus.includes(label)) setOpenMenus([label]);
+       return;
+    }
+    setOpenMenus(prev => 
+      prev.includes(label) ? prev.filter(l => l !== label) : [...prev, label]
+    );
+  };
 
   // Auto-collapse on POS and KDS page
   useEffect(() => {
@@ -134,43 +170,102 @@ export function Sidebar() {
 
         <nav className="flex-1 px-3 space-y-1 mt-4">
           {menuItems.filter(item => {
-            // Check role permission
+            // Role permission check first
             if (item.roles && !item.roles.includes(user?.role?.toLowerCase() || '')) return false;
             
-            // Check module subscription if required
+            // Module requirement check
             if ((item as any).requiresModule && !hasModule((item as any).requiresModule)) return false;
+
+            // LPG/Fuel station specialized inventory logic
+            const bizType = business?.type?.toUpperCase() || '';
+            const isLPGOrFuel = bizType.includes('LPG') || bizType.includes('FUEL');
+            
+            if (item.label === 'Inventory' && isLPGOrFuel && !hasModule('BULK_STOCK_MANAGEMENT')) {
+              return false;
+            }
             
             return true;
           }).map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = pathname === item.href || (item.subItems?.some(sub => pathname === sub.href));
+            const hasSubItems = (item as any).subItems && (item as any).subItems.length > 0;
+            const isExpanded = openMenus.includes(item.label);
+
+            const bizType = business?.type?.toUpperCase() || '';
+            const isLPGOrFuel = bizType.includes('LPG') || bizType.includes('FUEL');
+            let displayLabel = item.label;
+            if (item.label === 'Inventory' && isLPGOrFuel) {
+              displayLabel = 'Bulk Inventory';
+            }
+
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all group relative",
-                  isActive 
-                    ? "bg-teal-600 text-white shadow-lg shadow-teal-600/20" 
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
-                  isCollapsed && "justify-center"
-                )}
-                title={isCollapsed ? item.label : undefined}
-              >
-                <item.icon size={20} className={cn(isActive ? "text-white" : "text-slate-400 group-hover:text-slate-600")} />
-                
-                {!isCollapsed && (
-                  <span className="animate-in fade-in duration-200">{item.label}</span>
-                )}
-                
-                {!isCollapsed && isActive && <ChevronRight size={16} className="ml-auto opacity-70" />}
-                
-                {/* Tooltip for collapsed state */}
-                {isCollapsed && (
-                  <div className="absolute left-full ml-2 bg-slate-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
-                    {item.label}
+              <div key={item.label} className="space-y-1">
+                {hasSubItems && !isCollapsed ? (
+                  <div className="space-y-1">
+                    <div
+                      onClick={(e) => toggleMenu(item.label, e)}
+                      className={cn(
+                        "flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all group relative cursor-pointer",
+                        isActive
+                          ? "bg-teal-600 text-white shadow-lg shadow-teal-600/20" 
+                          : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                      )}
+                    >
+                      <item.icon size={20} className={cn(isActive && !pathname.includes('history') ? "text-white" : "text-slate-400 group-hover:text-slate-600")} />
+                      <span className="animate-in fade-in duration-200">{displayLabel}</span>
+                      <ChevronRight size={16} className={cn("ml-auto transition-transform duration-200", isExpanded && "rotate-90")} />
+                    </div>
+                    
+                    {isExpanded && (
+                      <div className="ml-9 space-y-1 mt-1 animate-in slide-in-from-top-1 duration-200">
+                        {item?.subItems?.map(sub => {
+                          const isSubActive = pathname === sub.href;
+                          return (
+                            <Link
+                              key={sub.href}
+                              href={sub.href}
+                              className={cn(
+                                "block px-3 py-2 rounded-lg text-xs font-medium transition-colors",
+                                isSubActive
+                                  ? "text-teal-600 bg-teal-50"
+                                  : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                              )}
+                            >
+                              {sub.label}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
+                ) : (
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium transition-all group relative",
+                      isActive 
+                        ? "bg-teal-600 text-white shadow-lg shadow-teal-600/20" 
+                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-900",
+                      isCollapsed && "justify-center"
+                    )}
+                    title={isCollapsed ? displayLabel : undefined}
+                  >
+                    <item.icon size={20} className={cn(isActive ? "text-white" : "text-slate-400 group-hover:text-slate-600")} />
+                    
+                    {!isCollapsed && (
+                      <span className="animate-in fade-in duration-200">{displayLabel}</span>
+                    )}
+                    
+                    {!isCollapsed && isActive && !hasSubItems && <ChevronRight size={16} className="ml-auto opacity-70" />}
+                    
+                    {/* Tooltip for collapsed state */}
+                    {isCollapsed && (
+                      <div className="absolute left-full ml-2 bg-slate-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50">
+                        {displayLabel}
+                      </div>
+                    )}
+                  </Link>
                 )}
-              </Link>
+              </div>
             );
           })}
         </nav>

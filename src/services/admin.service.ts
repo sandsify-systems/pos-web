@@ -133,6 +133,11 @@ export const AdminService = {
     return response.data;
   },
 
+  getBusinessDetails: async (id: number): Promise<BusinessDetails> => {
+    const response = await apiClient.get(`/admin/businesses/${id}/details`);
+    return response.data;
+  },
+
   // Subscriptions Actions
   renewSubscription: async (data: {
     business_id: number;
@@ -156,4 +161,37 @@ export interface Business {
   subscription_status: string;
   installer_id?: number;
   created_at: string;
+}
+
+export interface ChartDataPoint {
+  date: string;
+  revenue: number;
+  profit: number;
+  expense: number;
+}
+
+export interface BusinessDetails {
+  business: Business;
+  owner?: {
+    first_name: string;
+    last_name: string;
+    email: string;
+    phone: string;
+  };
+  staff: Array<{
+    id: number;
+    first_name: string;
+    last_name: string;
+    role: string;
+    email: string;
+  }>;
+  stats: {
+    revenue_today: number;
+    revenue_week: number;
+    revenue_month: number;
+    total_revenue: number;
+    total_profit: number;
+    total_expense: number;
+  };
+  chart_data: ChartDataPoint[];
 }

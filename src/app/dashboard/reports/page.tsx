@@ -126,16 +126,16 @@ export default function ReportsPage() {
         from: startDateStr,
         to: endDateStr
       });
-      setTransactions(sales);
+      setTransactions(sales || []);
 
       // Fetch product performance if not cashier
       if (!isCashier) {
         const perfData = await ReportService.getProductProfitReport(startDateStr, endDateStr);
-        setProductProfitData(perfData);
+        setProductProfitData(perfData || []);
 
         // Fetch monthly data for the chart (always 6 months for trend)
         const monthlyData = await ReportService.getMonthlyReport(6);
-        setMonthlyFinancials(monthlyData);
+        setMonthlyFinancials(monthlyData || []);
       }
 
     } catch (e) {
@@ -210,7 +210,7 @@ export default function ReportsPage() {
     setAuditLoading(true);
     try {
       const logs = await SalesService.getActivities();
-      setActivities(logs || []); // Ensure we always set an array, even if API returns null
+      setActivities(logs || []);
     } catch (e) {
       toast.error('Failed to load audit logs');
       setActivities([]); // Set empty array on error
@@ -219,7 +219,8 @@ export default function ReportsPage() {
     }
   };
 
-  const filteredTransactions = transactions.filter(t => {
+  const safeTransactions = transactions || [];
+  const filteredTransactions = safeTransactions.filter(t => {
     const method = (t.payment_method || t.paymentMethod || '').toLowerCase();
     const matchesFilter = selectedFilter === "all" || method === selectedFilter;
     const tUserId = t.user_id || t.userId;
@@ -227,9 +228,9 @@ export default function ReportsPage() {
     
     const query = searchQuery.toLowerCase();
     const matchesSearch = 
-      t.id.toString().includes(query) || 
+      t.id?.toString().includes(query) || 
       method.includes(query) ||
-      t.total.toString().includes(query);
+      t.total?.toString().includes(query);
 
     return matchesFilter && matchesUser && matchesSearch;
   });
@@ -262,7 +263,7 @@ export default function ReportsPage() {
   };
 
   const handleExportCSV = () => {
-    if (filteredTransactions.length === 0) {
+    if ((filteredTransactions?.length || 0) === 0) {
       toast.error("No transactions to export");
       return;
     }
@@ -409,7 +410,7 @@ export default function ReportsPage() {
                           <p className="text-slate-500">Loading audit trail...</p>
                         </td>
                       </tr>
-                    ) : activities.length === 0 ? (
+                    ) : (activities?.length || 0) === 0 ? (
                       <tr>
                         <td colSpan={4} className="px-6 py-12 text-center text-slate-400">
                           No activities found.
@@ -417,7 +418,7 @@ export default function ReportsPage() {
                       </tr>
                     ) : (
                       activities.map((log) => {
-                        const details = typeof log.details === 'string' ? JSON.parse(log.details) : log.details;
+                        const details = (typeof log.details === 'string' ? JSON.parse(log.details) : log.details) || {};
                         return (
                           <tr key={log.id} className="hover:bg-slate-50 transition-colors">
                             <td className="px-6 py-4">
@@ -511,7 +512,7 @@ export default function ReportsPage() {
                         <p className="text-slate-500">Loading expenses...</p>
                       </td>
                     </tr>
-                  ) : expenses.length === 0 ? (
+                  ) : (expenses?.length || 0) === 0 ? (
                     <tr>
                       <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
                         No expenses recorded for this period.
@@ -622,6 +623,55 @@ export default function ReportsPage() {
       ) : (
         <>
           {/* Sales Tab Content */}
+          {/* New: Bulk Inventory Section for LPG */}
+          {(business?.type === "LPG_STATION" || business?.type === "gas_station" || business?.type === "FUEL_STATION") && reportData && (
+            <div className="bg-white p-6 rounded-2xl border border-teal-500/20 shadow-sm space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-teal-50 rounded-lg">
+                  <TrendingUp size={20} className="text-teal-600" />
+                </div>
+                <h3 className="font-bold text-slate-900 leading-none">Bulk Stock Performance</h3>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Opening Stock</p>
+                  <p className="text-xl font-bold text-slate-900">{(reportData as any).opening_stock?.toFixed(2) || "0.00"} kg</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Stock Purchased (+)</p>
+                  <p className="text-xl font-bold text-teal-600">+{(reportData as any).stock_purchased?.toFixed(2) || "0.00"} kg</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Stock Sold (-)</p>
+                  <p className="text-xl font-bold text-rose-600">-{(reportData as any).stock_sold?.toFixed(2) || "0.00"} kg</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Closing Stock</p>
+                  <p className="text-xl font-bold text-slate-900">{(reportData as any).closing_stock?.toFixed(2) || "0.00"} kg</p>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                   <div className={`px-4 py-3 rounded-xl flex items-center gap-4 border ${
+                      Math.abs((reportData as any).stock_variance || 0) > 0.1 ? 'bg-rose-50 border-rose-100' : 'bg-green-50 border-green-100'
+                   }`}>
+                      <p className="text-sm font-medium text-slate-600">Daily Stock Variance:</p>
+                      <p className={`text-xl font-black ${
+                        Math.abs((reportData as any).stock_variance || 0) > 0.1 ? 'text-rose-600' : 'text-green-600'
+                      }`}>
+                         {((reportData as any).stock_variance || 0).toFixed(2)} kg
+                      </p>
+                   </div>
+                   <p className="text-xs text-slate-400 max-w-[200px]">
+                      A positive variance indicates a shortage, while negative indicates a surplus.
+                   </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {loading ? (
              <div className="flex items-center justify-center h-64">
                 <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
@@ -727,7 +777,7 @@ export default function ReportsPage() {
                 </div>
               )}
 
-              {!isCashier && monthlyFinancials.length > 0 && (
+              {!isCashier && (monthlyFinancials?.length || 0) > 0 && (
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                   <div className="flex items-center justify-between mb-6">
                     <div>
@@ -796,7 +846,7 @@ export default function ReportsPage() {
                     <div className="flex items-center gap-3">
                       <h3 className="font-bold text-slate-900">Recent Transactions</h3>
                       <span className="text-xs font-medium px-2 py-1 bg-slate-100 text-slate-600 rounded-full">
-                        {filteredTransactions.length}
+                        {filteredTransactions?.length || 0}
                       </span>
                     </div>
 
@@ -813,12 +863,12 @@ export default function ReportsPage() {
                   </div>
                   
                   <div className="divide-y divide-slate-100 max-h-[600px] overflow-y-auto">
-                    {filteredTransactions.length === 0 ? (
+                    {(filteredTransactions?.length || 0) === 0 ? (
                       <div className="p-8 text-center text-slate-500">
                         No transactions found for this period.
                       </div>
                     ) : (
-                      filteredTransactions.map((sale) => (
+                      (filteredTransactions || []).map((sale) => (
                         <div 
                           key={sale.id} 
                           className="p-4 hover:bg-slate-50 transition-colors cursor-pointer group flex items-center justify-between"
@@ -856,7 +906,7 @@ export default function ReportsPage() {
                     )}
                   </div>
 
-                  {!isCashier && productProfitData.length > 0 && (
+                  {!isCashier && (productProfitData?.length || 0) > 0 && (
                     <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm mt-6">
                       <div className="p-4 border-b border-slate-100">
                         <h3 className="font-bold text-slate-900">Product Performance</h3>
@@ -873,7 +923,7 @@ export default function ReportsPage() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
-                            {productProfitData.slice(0, 8).map((item) => (
+                            {(productProfitData || []).slice(0, 8).map((item) => (
                               <tr key={item.product_id} className="hover:bg-slate-50 transition-colors">
                                 <td className="px-4 py-3 font-medium text-slate-900">{item.product_name}</td>
                                 <td className="px-4 py-3 text-center text-slate-600">{item.total_qty}</td>

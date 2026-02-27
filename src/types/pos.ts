@@ -17,6 +17,8 @@ export interface Product {
   sku?: string;
   min_stock?: number;
   cost?: number;
+  track_by_round?: boolean;
+  unit_of_measure?: string;
 }
 
 export interface CartItem {

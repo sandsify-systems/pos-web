@@ -13,6 +13,12 @@ export interface DailyReport {
   total_expenses: number;
   net_profit: number;
   average_sale: number;
+  // Bulk Inventory (LPG)
+  opening_stock?: number;
+  closing_stock?: number;
+  stock_purchased?: number;
+  stock_sold?: number;
+  stock_variance?: number;
 }
 
 export interface SalesReport {
@@ -27,6 +33,12 @@ export interface SalesReport {
   total_expenses: number;
   net_profit: number;
   average_sale: number;
+  // Bulk Inventory (LPG)
+  opening_stock?: number;
+  closing_stock?: number;
+  stock_purchased?: number;
+  stock_sold?: number;
+  stock_variance?: number;
 }
 
 export interface ProductProfitStat {
@@ -64,12 +76,12 @@ export const ReportService = {
     if (to) params.push(`to=${to}`);
     if (params.length > 0) url += `?${params.join('&')}`;
     const res = await apiClient.get(url);
-    return res.data;
+    return res.data || [];
   },
 
   getMonthlyReport: async (months: number = 6): Promise<MonthlySummaryItem[]> => {
     const res = await apiClient.get(`/sales/reports/monthly?months=${months}`);
-    return res.data;
+    return res.data || [];
   },
 
   getSales: async (params: { from: string; to: string; status?: string }): Promise<any[]> => {
@@ -77,6 +89,6 @@ export const ReportService = {
     if (params.status) url += `&status=${params.status}`;
     const res = await apiClient.get(url);
     // Check structure - backend usually returns { sales: [...] } or just [...]
-    return res.data.sales || res.data; 
+    return res.data.sales || res.data || []; 
   }
 };

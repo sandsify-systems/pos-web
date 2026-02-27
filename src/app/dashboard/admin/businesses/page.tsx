@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AdminService, Business, BusinessModule } from '../../../../services/admin.service';
-import { Plus, Search, Edit2, Trash2, Building, AlertCircle, Package, RefreshCcw } from 'lucide-react';
+import { AdminService, Business, BusinessModule, BusinessDetails } from '../../../../services/admin.service';
+import { Plus, Search, Edit2, Trash2, Building, AlertCircle, Package, RefreshCcw, Eye, MapPin, Mail, Phone, Calendar, Users, TrendingUp, DollarSign, ArrowUpRight, X, User } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { formatCurrency, cn } from '../../../../lib/utils';
 
 export default function AdminBusinessesPage() {
   const [businesses, setBusinesses] = useState<Business[]>([]);
@@ -16,6 +18,9 @@ export default function AdminBusinessesPage() {
   const [bizModules, setBizModules] = useState<BusinessModule[]>([]);
   const [modulesLoading, setModulesLoading] = useState(false);
   const [resettingId, setResettingId] = useState<number | null>(null);
+  const [selectedDetails, setSelectedDetails] = useState<BusinessDetails | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -144,6 +149,20 @@ export default function AdminBusinessesPage() {
     }
   };
 
+  const handleViewDetails = async (biz: Business) => {
+    setShowDetailsModal(true);
+    setDetailsLoading(true);
+    try {
+      const details = await AdminService.getBusinessDetails(biz.id);
+      setSelectedDetails(details);
+    } catch (err) {
+      toast.error('Failed to load business details');
+      setShowDetailsModal(false);
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex justify-between items-center mb-8">
@@ -191,11 +210,14 @@ export default function AdminBusinessesPage() {
               {businesses.map((biz) => (
                 <tr key={biz.id} className="hover:bg-slate-50">
                   <td className="p-4 font-medium text-slate-900">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center text-teal-600">
+                    <div 
+                      className="flex items-center gap-3 cursor-pointer group"
+                      onClick={() => handleViewDetails(biz)}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center text-teal-600 group-hover:bg-teal-600 group-hover:text-white transition-all">
                         <Building size={16} />
                       </div>
-                      {biz.name}
+                      <span className="group-hover:text-teal-600 transition-colors">{biz.name}</span>
                     </div>
                   </td>
                   <td className="p-4 text-slate-600 font-mono text-xs">{biz.tenant_id}</td>
@@ -224,6 +246,13 @@ export default function AdminBusinessesPage() {
                       </span>
                   </td>
                   <td className="p-4 text-right flex items-center justify-end gap-2">
+                    <button 
+                      onClick={() => handleViewDetails(biz)}
+                      className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-blue-600 transition-colors"
+                      title="View Details"
+                    >
+                      <Eye size={16} />
+                    </button>
                     <button 
                       onClick={() => handleManageModules(biz)}
                       className="p-2 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-purple-600 transition-colors"
@@ -425,6 +454,226 @@ export default function AdminBusinessesPage() {
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Details Modal */}
+      {showDetailsModal && (
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] flex items-center justify-end p-0">
+          <div className="absolute inset-0" onClick={() => setShowDetailsModal(false)} />
+          <div className="relative bg-white w-full max-w-4xl h-full shadow-2xl animate-in slide-in-from-right duration-300 flex flex-col overflow-hidden">
+            
+            {/* Modal Header */}
+            <div className="p-8 border-b border-slate-50 flex items-center justify-between bg-white sticky top-0 z-10">
+              <div className="flex items-center gap-5">
+                <div className="w-16 h-16 rounded-[2rem] bg-slate-900 text-white flex items-center justify-center font-black text-2xl shadow-xl">
+                  {detailsLoading ? '-' : selectedDetails?.business.name[0]}
+                </div>
+                <div>
+                  <h2 className="text-3xl font-black text-slate-900 tracking-tighter">
+                    {detailsLoading ? 'Loading...' : selectedDetails?.business.name}
+                  </h2>
+                  <div className="flex items-center gap-4 mt-1">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                      <Calendar size={12} />
+                      Member since {detailsLoading ? '...' : new Date(selectedDetails?.business.created_at || '').toLocaleDateString()}
+                    </span>
+                    <span className={cn(
+                      "text-[10px] px-2 py-0.5 rounded-full font-black border",
+                      selectedDetails?.business.subscription_status === 'ACTIVE' ? "bg-teal-50 text-teal-600 border-teal-100" : "bg-amber-50 text-amber-600 border-amber-100"
+                    )}>
+                      {selectedDetails?.business.subscription_status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowDetailsModal(false)}
+                className="w-12 h-12 flex items-center justify-center hover:bg-slate-50 rounded-2xl transition-all text-slate-400 hover:text-slate-900"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {detailsLoading ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-4">
+                <RefreshCcw className="animate-spin text-teal-600" size={32} />
+                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Aggregating business data...</p>
+              </div>
+            ) : selectedDetails && (
+              <div className="flex-1 overflow-y-auto p-8 space-y-12">
+                
+                {/* Metrics Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 group hover:border-teal-200 transition-all">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Today's Revenue</p>
+                    <h3 className="text-2xl font-black text-slate-900">{formatCurrency(selectedDetails.stats.revenue_today, selectedDetails.business.currency)}</h3>
+                    <TrendingUp size={16} className="text-teal-500 mt-2 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                  <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 group hover:border-blue-200 transition-all">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Weekly Gross</p>
+                    <h3 className="text-2xl font-black text-slate-900">{formatCurrency(selectedDetails.stats.revenue_week, selectedDetails.business.currency)}</h3>
+                    <ArrowUpRight size={16} className="text-blue-500 mt-2 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                  <div className="p-6 bg-emerald-50/50 rounded-[2rem] border border-emerald-100">
+                    <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Lifetime Profit</p>
+                    <h3 className="text-2xl font-black text-emerald-700">{formatCurrency(selectedDetails.stats.total_profit, selectedDetails.business.currency)}</h3>
+                    <TrendingUp size={16} className="text-emerald-500 mt-2" />
+                  </div>
+                  <div className="p-6 bg-rose-50/50 rounded-[2rem] border border-rose-100">
+                    <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Total Expenses</p>
+                    <h3 className="text-2xl font-black text-rose-700">{formatCurrency(selectedDetails.stats.total_expense, selectedDetails.business.currency)}</h3>
+                    <DollarSign size={16} className="text-rose-500 mt-2" />
+                  </div>
+                </div>
+
+                {/* Main Content Layout */}
+                <div className="grid grid-cols-3 gap-10">
+                  
+                  {/* Left Column: Charts */}
+                  <div className="col-span-2 space-y-10">
+                    <div className="space-y-4">
+                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <TrendingUp size={14} />
+                        Financial Overview (6 Months Trend)
+                      </h3>
+                      <div className="h-[350px] w-full bg-white border border-slate-100 rounded-[2.5rem] p-6 shadow-sm">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={selectedDetails.chart_data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#0f172a" stopOpacity={0.1}/>
+                                <stop offset="95%" stopColor="#0f172a" stopOpacity={0}/>
+                              </linearGradient>
+                              <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
+                                <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                            <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'bold', fill: '#94a3b8'}} />
+                            <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fontWeight: 'bold', fill: '#94a3b8'}} />
+                            <Tooltip 
+                              contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '12px', fontWeight: 'bold' }}
+                            />
+                            <Area type="monotone" dataKey="revenue" stroke="#0f172a" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
+                            <Area type="monotone" dataKey="profit" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorProfit)" />
+                            <Area type="monotone" dataKey="expense" stroke="#ef4444" strokeWidth={3} fillOpacity={0} />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="flex gap-6 mt-4 ml-4">
+                        <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-slate-900" /><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Revenue</span></div>
+                        <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-emerald-500" /><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Gross Profit</span></div>
+                        <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-rose-500" /><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Expenses</span></div>
+                      </div>
+                    </div>
+
+                    {/* Staff List */}
+                    <div className="space-y-4">
+                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <Users size={14} />
+                        Staff Members ({selectedDetails.staff.length})
+                      </h3>
+                      <div className="grid grid-cols-2 gap-3">
+                        {selectedDetails.staff.map(member => (
+                          <div key={member.id} className="p-4 bg-white border border-slate-100 rounded-2xl flex items-center gap-4 hover:border-indigo-100 hover:bg-slate-50/50 transition-all">
+                            <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-xs">
+                              {member.first_name[0]}{member.last_name[0]}
+                            </div>
+                            <div>
+                              <p className="text-sm font-black text-slate-900">{member.first_name} {member.last_name}</p>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{member.role}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Business Info & Owner */}
+                  <div className="space-y-10">
+                    
+                    {/* Owner Details */}
+                    <div className="p-8 bg-slate-900 rounded-[2.5rem] text-white space-y-6 relative overflow-hidden">
+                       <User size={100} className="absolute -bottom-8 -right-8 opacity-10" />
+                       <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Business Owner</h3>
+                       {selectedDetails.owner ? (
+                         <div className="space-y-4">
+                            <div className="flex items-center gap-4">
+                              <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center font-black text-xl">
+                                {selectedDetails.owner.first_name[0]}{selectedDetails.owner.last_name[0]}
+                              </div>
+                              <div>
+                                <p className="text-lg font-black tracking-tight">{selectedDetails.owner.first_name} {selectedDetails.owner.last_name}</p>
+                                <p className="text-slate-400 text-xs font-medium">Verified Proprietor</p>
+                              </div>
+                            </div>
+                            <div className="space-y-3 pt-4">
+                              <div className="flex items-center gap-3 text-sm text-slate-300">
+                                <Mail size={16} className="text-teal-400" />
+                                {selectedDetails.owner.email}
+                              </div>
+                              <div className="flex items-center gap-3 text-sm text-slate-300">
+                                <Phone size={16} className="text-teal-400" />
+                                {selectedDetails.owner.phone || 'N/A'}
+                              </div>
+                            </div>
+                         </div>
+                       ) : (
+                         <p className="text-slate-500 italic text-sm">Owner details not available.</p>
+                       )}
+                    </div>
+
+                    {/* Address & Logistics */}
+                    <div className="space-y-4">
+                      <h3 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                        <MapPin size={14} />
+                        Physical Location
+                      </h3>
+                      <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 space-y-4">
+                        <div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Full Address</p>
+                          <p className="text-sm font-bold text-slate-700 leading-relaxed">{selectedDetails.business.address || 'Street address not mapped.'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">City / Region</p>
+                          <p className="text-sm font-bold text-slate-700">{selectedDetails.business.city || 'N/A'}</p>
+                        </div>
+                        <div className="pt-4 border-t border-slate-200/50 flex items-center justify-between">
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Settlement Currency</p>
+                            <p className="text-xs font-black text-slate-900">{selectedDetails.business.currency}</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tenant Hash</p>
+                            <code className="text-[10px] font-bold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-lg">{selectedDetails.business.tenant_id}</code>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Footer */}
+            <div className="p-8 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Business ID: BIZ-{selectedDetails?.business.id}</p>
+              <div className="flex items-center gap-4">
+                <button className="text-xs font-black text-slate-600 hover:text-slate-900 transition-all uppercase tracking-widest px-4 py-2 border border-slate-200 rounded-xl">Generate Audit PDF</button>
+                <button 
+                  onClick={() => {
+                    setEditingBusiness(selectedDetails?.business || null);
+                    setShowModal(true);
+                  }}
+                  className="px-6 py-2 bg-slate-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-800 transition-all"
+                >
+                  Edit profile
+                </button>
+              </div>
             </div>
           </div>
         </div>

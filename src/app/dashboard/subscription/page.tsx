@@ -41,6 +41,7 @@ export default function SubscriptionPage() {
   const [isVerifyingPromo, setIsVerifyingPromo] = useState(false);
   const [promoDiscount, setPromoDiscount] = useState(0);
   const [appliedPromo, setAppliedPromo] = useState<string | null>(null);
+  const isLPGOrFuel = business?.type === "LPG_STATION" || business?.type === "FUEL_STATION";
 
   const [savedCards, setSavedCards] = useState<PaymentMethod[]>([]);
   const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
@@ -59,8 +60,26 @@ export default function SubscriptionPage() {
        else setBillingCycle('MONTHLY');
        
        if (planType.includes('SERVICE')) setIsBasicMode(true);
+    } else if (isLPGOrFuel) {
+       setIsBasicMode(true);
     }
-  }, [activeModules, subscription]);
+
+    // Auto-apply influencer promo code if it exists
+    if (business?.default_promo_code && !appliedPromo && !promoCode) {
+        setPromoCode(business.default_promo_code);
+        setIsVerifyingPromo(true);
+        SubscriptionService.validatePromoCode(business.default_promo_code).then(res => {
+            if (res.success) {
+                setPromoDiscount(res.discount_percentage);
+                setAppliedPromo(business.default_promo_code!);
+            }
+        }).catch(() => {
+            console.log("Default promo code invalid or expired");
+        }).finally(() => {
+            setIsVerifyingPromo(false);
+        });
+    }
+  }, [activeModules, subscription, isLPGOrFuel, business, appliedPromo, promoCode]);
 
   useEffect(() => {
     const fetchCards = async () => {
@@ -317,19 +336,21 @@ export default function SubscriptionPage() {
                    >
                     Growing Business
                    </button>
-                   <button
-                    type="button"
-                    onClick={() => {
-                        setIsBasicMode(true);
-                        setSelectedModules([]); // Clear modules
-                    }}
-                    className={cn(
-                      "flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all relative z-10",
-                      isBasicMode ? "bg-white text-teal-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                    )}
-                   >
-                    Starter / Basic
-                   </button>
+                   {isLPGOrFuel && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                          setIsBasicMode(true);
+                          setSelectedModules([]); // Clear modules
+                      }}
+                      className={cn(
+                        "flex-1 py-3 px-4 rounded-xl text-sm font-bold transition-all relative z-10",
+                        isBasicMode ? "bg-white text-teal-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                      )}
+                    >
+                      Starter / Basic
+                    </button>
+                   )}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -375,7 +396,7 @@ export default function SubscriptionPage() {
                         </div>
                         <h3 className="text-lg font-black text-slate-900 mb-2">Basic Sales Mode</h3>
                         <p className="text-sm text-slate-500 max-w-md mx-auto mb-6">
-                            Perfect for small shops & kiosks. Includes sales tracking, receipt printing, and a catalog of up to 25 items.
+                            Perfect for small LPG/Fuel stations. Includes sales tracking, receipt printing, a catalog of up to 25 items, and <b>Bulk Inventory Management</b> included by default.
                         </p>
                         <div className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-slate-200 shadow-sm">
                             <span className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
@@ -681,10 +702,22 @@ export default function SubscriptionPage() {
                             <div className="w-1.5 h-1.5 rounded-full bg-teal-400 mt-1.5" />
                             <div>
                                 <p className="text-xs font-bold text-white">
+                                    {isBasicMode ? 'Bulk Stock Included' : 'Standard Inventory'}
+                                </p>
+                                <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
+                                    {isBasicMode ? 'Meter readings & tank dips' : 'Full inventory management'}
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-start gap-3">
+                            <div className="w-1.5 h-1.5 rounded-full bg-teal-400 mt-1.5" />
+                            <div>
+                                <p className="text-xs font-bold text-white">
                                     {isBasicMode ? '25 Product Limit' : 'Unlimited Products'}
                                 </p>
                                 <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
-                                    {isBasicMode ? 'Perfect for kiosks & small shops' : 'Full inventory management'}
+                                    {isBasicMode ? 'Perfect for small catalogs' : 'Scale without limits'}
                                 </p>
                             </div>
                         </div>

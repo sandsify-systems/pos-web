@@ -41,10 +41,11 @@ export const ShiftService = {
     return response.data.data;
   },
 
-  endShift: async (shiftId: number, endCash: number, notes?: string): Promise<Shift> => {
+  endShift: async (shiftId: number, endCash: number, readings?: any[], notes?: string): Promise<Shift> => {
     const response = await apiClient.post(`/shifts/${shiftId}/end`, {
       end_cash: endCash,
-      notes: notes
+      readings,
+      notes
     });
     return response.data.data;
   },

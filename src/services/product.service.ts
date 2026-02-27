@@ -64,6 +64,20 @@ export const ProductService = {
   getLowStockProducts: async (): Promise<Product[]> => {
     const res = await apiClient.get('/products/low-stock');
     return res.data;
+  },
+
+  getActiveRounds: async (): Promise<any[]> => {
+    const res = await apiClient.get('/inventory/rounds/active');
+    return res.data;
+  },
+
+  startNewRound: async (data: any): Promise<any> => {
+    const res = await apiClient.post('/inventory/rounds', data);
+    return res.data;
+  },
+
+  closeRound: async (id: number): Promise<void> => {
+    await apiClient.post(`/inventory/rounds/${id}/close`);
   }
 };
 

@@ -44,6 +44,7 @@ export interface Subscription {
   amount_paid: number;
   payment_method?: string;
   transaction_reference: string;
+  description: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -81,6 +82,11 @@ export const SubscriptionService = {
 
   getStatus: async (): Promise<Subscription | { status: "NONE" }> => {
     const response = await apiClient.get('/subscription/status');
+    return response.data;
+  },
+
+  getHistory: async (): Promise<Subscription[]> => {
+    const response = await apiClient.get('/subscription/history');
     return response.data;
   },
 
@@ -167,6 +173,32 @@ export const SubscriptionService = {
 
   getTrialChecklist: async (): Promise<TrialChecklist> => {
     const response = await apiClient.get('/trial-checklist');
+    return response.data;
+  },
+
+  // Affiliates/Influencers
+  getAffiliates: async (): Promise<any[]> => {
+    const response = await apiClient.get('/admin/affiliates');
+    return response.data;
+  },
+
+  createInfluencer: async (data: any): Promise<any> => {
+    const response = await apiClient.post('/admin/affiliates', data);
+    return response.data;
+  },
+
+  getAffiliateStats: async (id: number): Promise<any> => {
+    const response = await apiClient.get(`/admin/affiliates/${id}/stats`);
+    return response.data;
+  },
+
+  updateAffiliate: async (id: number, data: any): Promise<any> => {
+    const response = await apiClient.put(`/admin/affiliates/${id}`, data);
+    return response.data;
+  },
+
+  deleteAffiliate: async (id: number): Promise<any> => {
+    const response = await apiClient.delete(`/admin/affiliates/${id}`);
     return response.data;
   },
 };
