@@ -36,7 +36,8 @@ export default function CompliancePage() {
   const [activeTab, setActiveTab] = useState<'audit' | 'export'>('audit');
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [actionFilter, setActionFilter] = useState('');
   const [isPlaying, setIsPlaying] = useState(false);
   const [highlightIdx, setHighlightIdx] = useState(-1);
@@ -47,7 +48,7 @@ export default function CompliancePage() {
 
   useEffect(() => {
     if (activeTab === 'audit') fetchAuditTrail();
-  }, [activeTab, selectedDate, actionFilter]);
+  }, [activeTab, startDate, endDate, actionFilter]);
 
   useEffect(() => {
     // Default export dates to this month
@@ -81,7 +82,7 @@ export default function CompliancePage() {
     setLoading(true);
     setModuleError(false);
     try {
-      const data = await ComplianceService.getAuditTrail(selectedDate, actionFilter || undefined);
+      const data = await ComplianceService.getAuditTrail(startDate, endDate, actionFilter || undefined);
       setAuditLogs(data || []);
     } catch (err: any) {
       if (err?.response?.status === 403) {
@@ -181,8 +182,15 @@ export default function CompliancePage() {
               <Calendar size={16} className="text-slate-400" />
               <input
                 type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-transparent text-sm text-slate-700 outline-none"
+              />
+              <span className="text-slate-300">-</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
                 className="bg-transparent text-sm text-slate-700 outline-none"
               />
             </div>
@@ -230,7 +238,10 @@ export default function CompliancePage() {
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-700">
-                Activity Log — {new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                Activity Log — {startDate === endDate 
+                  ? new Date(startDate).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+                  : `${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}`
+                }
               </h3>
               <span className="text-xs text-slate-400">{auditLogs.length} events</span>
             </div>

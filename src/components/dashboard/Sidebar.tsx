@@ -169,7 +169,7 @@ export function Sidebar() {
           {isCollapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
         </button>
 
-        <nav className="flex-1 px-3 space-y-1 mt-4">
+        <nav className="flex-1 px-3 space-y-1 mt-4 overflow-y-auto custom-scrollbar shadow-inner bg-white">
           {menuItems.filter(item => {
             // Role permission check first
             if (item.roles && !item.roles.includes(user?.role?.toLowerCase() || '')) return false;

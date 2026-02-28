@@ -33,8 +33,8 @@ export const SalesService = {
     return res.data;
   },
 
-  getActivities: async (): Promise<any[]> => {
-    const res = await apiClient.get('/activities');
+  getActivities: async (filters?: { from?: string; to?: string; action_type?: string }): Promise<any[]> => {
+    const res = await apiClient.get('/activities', { params: filters });
     return res.data;
   }
 };

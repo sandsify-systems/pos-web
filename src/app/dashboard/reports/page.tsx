@@ -19,7 +19,8 @@ import {
   Download,
   ShieldCheck,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { ReceiptModal } from '@/components/ReceiptModal';
@@ -63,6 +64,8 @@ export default function ReportsPage() {
   // Audit Log State
   const [activities, setActivities] = useState<any[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
+  const [auditStartDate, setAuditStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [auditEndDate, setAuditEndDate] = useState(new Date().toISOString().split('T')[0]);
 
   // Receipt Modal State
   const [selectedTransaction, setSelectedTransaction] = useState<Sale | null>(null);
@@ -86,7 +89,7 @@ export default function ReportsPage() {
         fetchExpenses();
       }
     }
-  }, [selectedPeriod, business, user, isCashier, customDate, activeTab]);
+  }, [selectedPeriod, business, user, isCashier, customDate, activeTab, auditStartDate, auditEndDate]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -209,7 +212,10 @@ export default function ReportsPage() {
   const fetchActivities = async () => {
     setAuditLoading(true);
     try {
-      const logs = await SalesService.getActivities();
+      const logs = await SalesService.getActivities({
+        from: auditStartDate,
+        to: auditEndDate
+      });
       setActivities(logs || []);
     } catch (e) {
       toast.error('Failed to load audit logs');
@@ -384,12 +390,31 @@ export default function ReportsPage() {
                     <p className="text-sm text-slate-500">Real-time track of sensitive business actions</p>
                   </div>
                 </div>
-                <button 
-                  onClick={fetchActivities}
-                  className="p-2 text-slate-400 hover:text-rose-600 transition-colors"
-                >
-                  {auditLoading ? <Loader2 className="animate-spin" size={20} /> : <Calendar size={20} />}
-                </button>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+                    <Calendar size={14} className="text-slate-400" />
+                    <input 
+                      type="date" 
+                      value={auditStartDate}
+                      onChange={(e) => setAuditStartDate(e.target.value)}
+                      className="bg-transparent text-xs font-bold text-slate-700 outline-none"
+                    />
+                    <span className="text-slate-300">-</span>
+                    <input 
+                      type="date" 
+                      value={auditEndDate}
+                      onChange={(e) => setAuditEndDate(e.target.value)}
+                      className="bg-transparent text-xs font-bold text-slate-700 outline-none"
+                    />
+                  </div>
+                  <button 
+                    onClick={fetchActivities}
+                    className="p-2 bg-white border border-slate-200 rounded-xl text-slate-400 hover:text-rose-600 hover:border-rose-100 transition-all shadow-sm"
+                    title="Refresh Log"
+                  >
+                    {auditLoading ? <Loader2 className="animate-spin" size={20} /> : <RefreshCw size={20} />}
+                  </button>
+                </div>
              </div>
 
              <div className="overflow-x-auto">

@@ -22,12 +22,15 @@ export const ComplianceService = {
     return res.data;
   },
 
-  // Get audit trail logs for a date
-  getAuditTrail: async (date?: string, actionType?: string): Promise<AuditLogEntry[]> => {
-    let url = '/compliance/audit-trail?';
-    if (date) url += `date=${date}&`;
-    if (actionType) url += `action_type=${actionType}`;
-    const res = await apiClient.get(url);
+  // Get audit trail logs for a date range
+  getAuditTrail: async (startDate?: string, endDate?: string, actionType?: string): Promise<AuditLogEntry[]> => {
+    const res = await apiClient.get('/compliance/audit-trail', {
+      params: { 
+        start_date: startDate, 
+        end_date: endDate, 
+        action_type: actionType 
+      }
+    });
     return res.data;
   },
 };
