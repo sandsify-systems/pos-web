@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import axios from 'axios';
 import { 
   Search, 
   Grid, 
@@ -264,7 +265,62 @@ export default function POSPage() {
     setCheckoutView('payment');
   };
 
-  const handleProcessPayment = async () => {
+  const [isPolling, setIsPolling] = useState(false);
+  const [paymentRef, setPaymentRef] = useState<string | null>(null);
+
+  const startPolling = (ref: string) => {
+    setIsPolling(true);
+    setPaymentRef(ref);
+
+    // WebSocket Integration (Phase 2.0)
+    const host = process.env.NEXT_PUBLIC_API_URL || 'https://pos-v2-backend.onrender.com';
+    const wsUrl = host.replace('http', 'ws') + `/api/v1/ws/kds?business_id=${business?.id}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (e) => {
+      try {
+        const event = JSON.parse(e.data);
+        if (event.type === 'PAYMENT_VERIFIED' && event.data.internal_reference === ref) {
+          ws.close();
+          setCheckoutView('receipt');
+          clearCart();
+          toast.success('Payment Verified! (via Real-time Push)');
+          setIsPolling(false);
+        }
+      } catch (err) {
+        console.error("WS Parse error", err);
+      }
+    };
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await axios.get(`${host}/api/v1/reconciliation/status/${ref}`);
+        if (res.data.status === 'SUCCESS' || res.data.status === 'MISMATCH') {
+          clearInterval(interval);
+          ws.close();
+          setIsPolling(false);
+          setCheckoutView('receipt');
+          clearCart();
+          toast.success('Payment Verified! Sale completed.');
+        } else if (res.data.status === 'FAILED') {
+          clearInterval(interval);
+          ws.close();
+          setIsPolling(false);
+          toast.error('Terminal payment failed.');
+        }
+      } catch (e) {
+        console.error("Polling error", e);
+      }
+    }, 3000);
+
+    setTimeout(() => {
+      clearInterval(interval);
+      ws.close();
+      setIsPolling(false);
+    }, 180000); // 3 min timeout
+  };
+
+  const handleProcessPayment = async (isManualConfirm = false) => {
     if (items.length === 0) return;
     setIsProcessing(true);
     try {
@@ -282,6 +338,13 @@ export default function POSPage() {
       };
 
       const response = await SalesService.createSale(payload);
+
+      // Handle Verification Logic
+      if (!isManualConfirm && response.sale?.status === 'PENDING_PAYMENT' && response.sale?.internal_reference) {
+        startPolling(response.sale.internal_reference);
+        return;
+      }
+
       setCompletedSale(response);
       setCheckoutView('receipt');
       clearCart();
@@ -846,45 +909,74 @@ export default function POSPage() {
 
            <div className="flex-1 overflow-y-auto p-6 bg-slate-50/30">
              <div className="max-w-2xl mx-auto space-y-6">
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                 {[
-                   { id: 'CASH', name: 'Cash', icon: Banknote, desc: 'Physical currency' },
-                   { id: 'CARD', name: 'Card (In-App)', icon: CreditCard, desc: 'Process via web hook' },
-                   { id: 'EXTERNAL_TERMINAL', name: 'External Terminal', icon: Smartphone, desc: 'MoniePoint, Opay, etc.' },
-                   { id: 'TRANSFER', name: 'Bank Transfer', icon: RefreshCw, desc: 'Manual verification' }
-                 ].map(method => (
-                   <button
-                     key={method.id}
-                     onClick={() => {
-                        setPaymentMethod(method.id as any);
-                        if (method.id === 'EXTERNAL_TERMINAL') setShowProviderModal(true);
-                     }}
-                     className={cn(
-                        "flex items-center gap-4 p-5 rounded-2xl border-2 transition-all text-left bg-white",
-                        paymentMethod === method.id ? "border-teal-600 shadow-lg shadow-teal-600/5" : "border-slate-100 hover:border-slate-300"
-                     )}
-                   >
-                     <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", paymentMethod === method.id ? "bg-teal-600 text-white" : "bg-slate-100 text-slate-500")}>
-                       <method.icon size={24} />
-                     </div>
-                     <div className="flex-1">
-                       <h3 className="font-bold text-sm text-slate-900">{method.name}</h3>
-                       <p className="text-[10px] text-slate-500 mt-1">{method.desc}</p>
-                     </div>
-                     {paymentMethod === method.id && <CheckCircle2 size={18} className="text-teal-600" />}
-                   </button>
-                 ))}
-               </div>
+              {isPolling ? (
+                <div className="bg-white rounded-3xl border-2 border-teal-100 p-8 text-center space-y-6 shadow-xl shadow-teal-500/5 animate-in zoom-in-95 duration-300">
+                  <div className="w-20 h-20 bg-teal-50 rounded-full flex items-center justify-center mx-auto">
+                    <Loader2 className="animate-spin text-teal-600" size={40} />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black text-slate-900">Awaiting Bank Alert...</h3>
+                    <p className="text-slate-500 mt-1">Please confirm the customer has paid on the terminal.</p>
+                  </div>
+                  
+                  <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2">Internal Reference</p>
+                    <p className="text-4xl font-black text-slate-800 tracking-tighter font-mono">{paymentRef}</p>
+                  </div>
 
-               <button 
-                 onClick={handleProcessPayment}
-                 disabled={isProcessing}
-                 className="w-full py-4 bg-teal-600 text-white rounded-2xl font-bold text-lg hover:bg-teal-700 transition-all flex items-center justify-center gap-3 mt-4"
-               >
-                 {isProcessing ? <Loader2 className="animate-spin" /> : <CheckCircle2 />} 
-                 Complete Payment
-               </button>
-             </div>
+                  <div className="pt-4 border-t border-slate-50 flex flex-col gap-3">
+                    <button 
+                      onClick={() => handleProcessPayment(true)}
+                      className="w-full py-4 bg-amber-50 text-amber-700 rounded-xl font-bold hover:bg-amber-100 transition-all border border-amber-200"
+                    >
+                      Skip Verification & Confirm Manually
+                    </button>
+                    <p className="text-[10px] text-slate-400">Owner role required for manual overrides in some configurations.</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {[
+                    { id: 'CASH', name: 'Cash', icon: Banknote, desc: 'Physical currency' },
+                    { id: 'CARD', name: 'Card (In-App)', icon: CreditCard, desc: 'Process via web hook' },
+                    { id: 'EXTERNAL_TERMINAL', name: 'External Terminal', icon: Smartphone, desc: 'MoniePoint, Opay, etc.' },
+                    { id: 'TRANSFER', name: 'Bank Transfer', icon: RefreshCw, desc: 'Manual verification' }
+                  ].map(method => (
+                    <button
+                      key={method.id}
+                      onClick={() => {
+                         setPaymentMethod(method.id as any);
+                         if (method.id === 'EXTERNAL_TERMINAL') setShowProviderModal(true);
+                      }}
+                      className={cn(
+                         "flex items-center gap-4 p-5 rounded-2xl border-2 transition-all text-left bg-white",
+                         paymentMethod === method.id ? "border-teal-600 shadow-lg shadow-teal-600/5" : "border-slate-100 hover:border-slate-300"
+                      )}
+                    >
+                      <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", paymentMethod === method.id ? "bg-teal-600 text-white" : "bg-slate-100 text-slate-500")}>
+                        <method.icon size={24} />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-bold text-sm text-slate-900">{method.name}</h3>
+                        <p className="text-[10px] text-slate-500 mt-1">{method.desc}</p>
+                      </div>
+                      {paymentMethod === method.id && <CheckCircle2 size={18} className="text-teal-600" />}
+                    </button>
+                  ))}
+                </div>
+
+                <button 
+                  onClick={() => handleProcessPayment(false)}
+                  disabled={isProcessing}
+                  className="w-full py-4 bg-teal-600 text-white rounded-2xl font-bold text-lg hover:bg-teal-700 transition-all flex items-center justify-center gap-3 mt-4"
+                >
+                  {isProcessing ? <Loader2 className="animate-spin" /> : <CheckCircle2 />} 
+                  Complete Payment
+                </button>
+                </>
+              )}
+            </div>
            </div>
         </div>
 
@@ -927,6 +1019,51 @@ export default function POSPage() {
           availableStock={selectedGasProduct.stock}
           currency={business?.currency}
         />
+      )}
+
+      {/* Provider Selection Modal */}
+      {showProviderModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+               <div>
+                  <h3 className="font-black text-xl text-slate-900 tracking-tight">External Terminal</h3>
+                  <p className="text-xs text-slate-500 font-medium">Select your POS hardware provider</p>
+               </div>
+               <button onClick={() => setShowProviderModal(false)} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                  <X size={20} className="text-slate-500" />
+               </button>
+            </div>
+            
+            <div className="p-8 grid grid-cols-2 gap-4">
+              {[
+                { id: 'moniepoint', name: 'MoniePoint', icon: 'MP', color: 'bg-blue-600' },
+                { id: 'opay', name: 'OPay', icon: 'OP', color: 'bg-emerald-600' },
+                { id: 'palmpay', name: 'PalmPay', icon: 'PP', color: 'bg-indigo-600' },
+                { id: 'transfer', name: 'Bank Transfer', icon: <RefreshCw size={24}/>, color: 'bg-amber-600' }
+              ].map(prov => (
+                <button
+                  key={prov.id}
+                  onClick={() => {
+                    setSelectedProvider(prov.id);
+                    setShowProviderModal(false);
+                    handleProcessPayment(false); // Trigger the actual sale creation & reconciliation
+                  }}
+                  className="flex flex-col items-center gap-4 p-6 rounded-2xl border-2 border-slate-100 hover:border-teal-500 hover:bg-teal-50/30 transition-all group"
+                >
+                  <div className={cn("w-16 h-16 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg group-hover:scale-110 transition-transform", prov.color)}>
+                     {prov.icon}
+                  </div>
+                  <span className="font-bold text-slate-900">{prov.name}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="p-4 bg-slate-50 border-t border-slate-100 text-center">
+               <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest italic">Secure end-to-end reconciliation active</p>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -20,7 +20,8 @@ import {
   CreditCard,
   BookOpen,
   ShieldCheck,
-  QrCode
+  QrCode,
+  History
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useAuth } from '../../contexts/AuthContext';
@@ -58,6 +59,7 @@ const menuItems = [
   },
   { icon: ShieldCheck, label: 'Compliance', href: '/dashboard/compliance', roles: ['owner', 'admin', 'manager'], requiresModule: 'AUTOMATED_COMPLIANCE' },
   { icon: QrCode, label: 'QR Digital Menu', href: '/dashboard/qr-menu', roles: ['owner', 'admin', 'manager'], requiresModule: 'DIGITAL_MENU_QR' },
+  { icon: History, label: 'Reconciliation', href: '/dashboard/reconciliation', roles: ['owner', 'admin'] },
   { icon: Users, label: 'Staff', href: '/dashboard/staff', roles: ['owner', 'admin', 'manager'] },
   { icon: BookOpen, label: 'How It Works', href: '/dashboard/how-it-works', roles: ['owner', 'admin', 'manager', 'cashier'] },
   { icon: Settings, label: 'Settings', href: '/dashboard/settings', roles: ['owner', 'admin', 'manager'] },

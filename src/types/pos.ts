@@ -27,18 +27,22 @@ export interface CartItem {
   discount: number;
 }
 
+export interface PaymentInfo {
+  method: string;
+  amount: number;
+  terminal_provider?: string | null;
+}
+
 export interface SaleRequest {
   items: {
     product_id: number;
     quantity: number;
   }[];
-  payment_method: string;
-  amount_paid: number;
+  payments: PaymentInfo[];
   tax: number;
   discount: number;
   table_number?: string;
   shift_id?: number;
-  terminal_provider?: string | null;
 }
 
 export interface SaleResponse {
