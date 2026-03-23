@@ -19,7 +19,8 @@ import {
   Sparkles,
   AlertCircle,
   Calendar,
-  Info
+  Info,
+  LogOut
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import Script from 'next/script';
@@ -81,7 +82,7 @@ const BUSINESS_TYPE_MODULES: Record<string, { recommended: string[], visible: st
 
 export default function CheckoutPage() {
   const router = useRouter();
-  const { business, user } = useAuth();
+  const { business, user, logout } = useAuth();
   const { plans, availableModules, availableBundles, subscription, modules: activeModules, isSubscribed, processSubscription, loading: subLoading } = useSubscription();
   
   const [billingCycle, setBillingCycle] = useState<'MONTHLY' | 'QUARTERLY' | 'ANNUAL'>('MONTHLY');
@@ -308,13 +309,22 @@ export default function CheckoutPage() {
            
            {/* Header */}
            <div className="space-y-4">
-              <button 
-                onClick={() => router.push('/dashboard')}
-                className="flex items-center gap-2 text-slate-400 hover:text-teal-600 font-bold transition-colors group mb-6"
-              >
-                <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-                <span className="text-xs uppercase tracking-widest text-[10px]">Back to terminal</span>
-              </button>
+              <div className="flex items-center justify-between mb-6">
+                <button 
+                  onClick={() => router.push('/dashboard')}
+                  className="flex items-center gap-2 text-slate-400 hover:text-teal-600 font-bold transition-colors group"
+                >
+                  <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+                  <span className="text-xs uppercase tracking-widest text-[10px]">Back to terminal</span>
+                </button>
+                <button 
+                  onClick={logout}
+                  className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl font-bold transition-all group"
+                >
+                  <LogOut size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                  <span className="text-[10px] uppercase tracking-widest">Logout</span>
+                </button>
+              </div>
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-teal-50 text-teal-700 rounded-full text-[10px] font-black uppercase tracking-widest border border-teal-100">
                  <Globe size={14} />
                  Secure International Checkout
