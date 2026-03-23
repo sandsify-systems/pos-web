@@ -422,10 +422,12 @@ export default function CheckoutPage() {
               <div className="grid grid-cols-1 gap-3">
                  {availableModules.filter((mod) => {
                    const config = BUSINESS_TYPE_MODULES[business?.type || 'OTHER'] || BUSINESS_TYPE_MODULES.OTHER;
-                   return config.recommended.includes(mod.type) || config.visible.includes(mod.type);
+                   const isPreviouslyActive = activeModules.some(m => m.module === mod.type);
+                   return config.recommended.includes(mod.type) || config.visible.includes(mod.type) || isPreviouslyActive;
                  }).map((mod) => {
                    const config = BUSINESS_TYPE_MODULES[business?.type || 'OTHER'] || BUSINESS_TYPE_MODULES.OTHER;
                    const isRecommended = config.recommended.includes(mod.type);
+                   const isPreviouslyActive = activeModules.some(m => m.module === mod.type);
                    const isSelected = selectedModules.includes(mod.type);
                    return (
                      <div 
@@ -434,11 +436,18 @@ export default function CheckoutPage() {
                         className={cn(
                             "flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer relative",
                             isSelected 
-                                ? "border-teal-500 bg-teal-50/30" 
+                                ? isPreviouslyActive 
+                                  ? "border-teal-500 bg-teal-50/30 ring-1 ring-teal-200"
+                                  : "border-teal-500 bg-teal-50/30" 
                                 : "border-slate-200 bg-white hover:border-slate-300"
                         )}
                      >
-                        {isRecommended && !isSelected && (
+                        {isPreviouslyActive && (
+                          <div className="absolute top-0 right-0 px-2 py-0.5 bg-amber-50 text-[8px] font-black text-amber-600 rounded-bl-xl border-l border-b border-amber-200 shadow-sm z-10">
+                             PREVIOUSLY ACTIVE
+                          </div>
+                        )}
+                        {isRecommended && !isSelected && !isPreviouslyActive && (
                           <div className="absolute top-0 right-0 px-2 py-0.5 bg-teal-50 text-[8px] font-black text-teal-600 rounded-bl-xl border-l border-b border-teal-100 shadow-sm z-10">
                              RECOMMENDED
                           </div>
