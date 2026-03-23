@@ -85,23 +85,23 @@ const BUSINESS_TYPE_MODULES: Record<string, { recommended: string[], visible: st
 
 const FALLBACK_PRICING = {
   plans: [
-    { type: 'MONTHLY', name: 'Standard Monthly', price: 30000, duration_days: 30, description: 'Optimized for 3 staff and 300 products.' },
-    { type: 'QUARTERLY', name: 'Standard Quarterly', price: 81000, duration_days: 90, description: 'Optimized for 7 staff and 1500 products.' },
-    { type: 'ANNUAL', name: 'Standard Annual', price: 300000, duration_days: 365, description: 'Optimized for 15 staff and 5000 products.' },
-    { type: 'SERVICE_MONTHLY', name: 'Basic Sales POS (Monthly)', price: 15000, duration_days: 30, description: 'Strictly for kiosks/LPG/small shops.' },
-    { type: 'SERVICE_QUARTERLY', name: 'Basic Sales POS (Quarterly)', price: 40000, duration_days: 90, description: 'Strictly for kiosks/LPG/small shops.' },
-    { type: 'SERVICE_ANNUAL', name: 'Basic Sales POS (Annual)', price: 150000, duration_days: 365, description: 'Strictly for kiosks/LPG/small shops.' }
+    { type: 'ESSENTIAL_MONTHLY', name: 'Essential Monthly', price: 12500, duration_days: 30, description: 'Optimized for 2 staff and 300 products.' },
+    { type: 'ESSENTIAL_ANNUAL', name: 'Essential Annual', price: 100000, duration_days: 365, description: 'Optimized for 2 staff and 300 products.' },
+    { type: 'GROWTH_MONTHLY', name: 'Growth Monthly', price: 25000, duration_days: 30, description: 'Optimized for 10 staff and 2500 products.', popular: true },
+    { type: 'GROWTH_ANNUAL', name: 'Growth Annual', price: 200000, duration_days: 365, description: 'Optimized for 10 staff and 2500 products.', popular: true },
+    { type: 'SCALE_MONTHLY', name: 'Scale Monthly', price: 55000, duration_days: 30, description: 'Optimized for 50 staff and 15000 products.' },
+    { type: 'SCALE_ANNUAL', name: 'Scale Annual', price: 440000, duration_days: 365, description: 'Optimized for 50 staff and 15000 products.' }
   ],
   modules: [
-    { type: 'KITCHEN_DISPLAY', name: 'Kitchen Display System (KDS)', price: 5000, description: 'Real-time kitchen order monitor for chefs' },
-    { type: 'TABLE_MANAGEMENT', name: 'Table Management', price: 5000, description: 'Track floor layouts and table status' },
-    { type: 'SAVE_DRAFTS', name: 'Save Drafts', price: 4000, description: 'Save and resume incomplete orders' },
-    { type: 'ADVANCED_INVENTORY', name: 'Advanced Inventory Control', price: 18000, description: 'Batch tracking, shrinkage alerts, and stock history' },
-    { type: 'RECIPE_MANAGEMENT', name: 'Recipe & Cost Control (BOM)', price: 15000, description: 'Ingredient-level cost tracking per item sold' },
-    { type: 'WHATSAPP_ALERTS', name: 'Security & Owner WhatsApp Alerts', price: 8000, description: 'Instant alerts for voids, overrides, refunds, and logins' },
-    { type: 'AUTOMATED_COMPLIANCE', name: 'Automated Compliance & Audit Replay', price: 15000, description: 'Tax-ready reports, audit trail, and activity playback' },
-    { type: 'DIGITAL_MENU_QR', name: 'QR Digital Menu', price: 8000, description: 'Public QR-based digital menu with live product updates' },
-    { type: 'BULK_STOCK_MANAGEMENT', name: 'Bulk Stock & Round Tracking', price: 12000, description: 'Specialized tracking for fuel, gas, and bulk commodities.' }
+    { type: 'KITCHEN_DISPLAY', name: 'Kitchen Display System (KDS)', price: 4000, description: 'Real-time kitchen order monitor for chefs' },
+    { type: 'TABLE_MANAGEMENT', name: 'Table Management', price: 4000, description: 'Track floor layouts and table status' },
+    { type: 'SAVE_DRAFTS', name: 'Save Drafts', price: 3000, description: 'Save and resume incomplete orders' },
+    { type: 'ADVANCED_INVENTORY', name: 'Advanced Inventory Control', price: 15000, description: 'Batch tracking, shrinkage alerts, and stock history' },
+    { type: 'RECIPE_MANAGEMENT', name: 'Recipe & Cost Control (BOM)', price: 12000, description: 'Ingredient-level cost tracking per item sold' },
+    { type: 'WHATSAPP_ALERTS', name: 'Security & Owner WhatsApp Alerts', price: 5000, description: 'Instant alerts for voids, overrides, refunds, and logins' },
+    { type: 'AUTOMATED_COMPLIANCE', name: 'Automated Compliance & Audit Replay', price: 12000, description: 'Tax-ready reports, audit trail, and activity playback' },
+    { type: 'DIGITAL_MENU_QR', name: 'QR Digital Menu', price: 5000, description: 'Public QR-based digital menu with live product updates' },
+    { type: 'BULK_STOCK_MANAGEMENT', name: 'Bulk Stock & Round Tracking', price: 10000, description: 'Specialized tracking for fuel, gas, and bulk commodities.' }
   ]
 };
 
@@ -272,44 +272,35 @@ function RegisterForm() {
 
   const calculateTotalForCycle = (cycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL') => {
     let total = 0;
-    const multiplier = cycle === 'ANNUAL' ? 12 : cycle === 'QUARTERLY' ? 3 : 1;
     
-    // Default system discounts (10% quarterly, 15% annual)
-    let discount = cycle === 'ANNUAL' ? 0.85 : cycle === 'QUARTERLY' ? 0.9 : 1;
-
-    // Apply Global Promotion if active
-    if (activePromotion) {
-      if (cycle === 'QUARTERLY') discount = (100 - activePromotion.quarterly_discount) / 100;
-      else if (cycle === 'ANNUAL') discount = (100 - activePromotion.annual_discount) / 100;
-    }
+    // Convert current base_plan_type (which might be TRIAL or GROWTH_MONTHLY) to target tier
+    let currentTier = formData.base_plan_type.split('_')[0];
+    if (currentTier === 'TRIAL') currentTier = 'GROWTH';
 
     // 1. Base Plan Price
-    let targetPlanType = formData.base_plan_type;
-    if (targetPlanType === 'TRIAL' || targetPlanType === 'MONTHLY') {
-      if (cycle === 'QUARTERLY') targetPlanType = 'QUARTERLY';
-      else if (cycle === 'ANNUAL') targetPlanType = 'ANNUAL';
-      else targetPlanType = 'MONTHLY';
-    } else if (targetPlanType === 'SERVICE_MONTHLY' || targetPlanType.includes('SERVICE')) {
-      if (cycle === 'QUARTERLY') targetPlanType = 'SERVICE_QUARTERLY';
-      else if (cycle === 'ANNUAL') targetPlanType = 'SERVICE_ANNUAL';
-      else targetPlanType = 'SERVICE_MONTHLY';
-    }
+    const cycleSuffix = cycle === 'ANNUAL' ? '_ANNUAL' : '_MONTHLY';
+    const finalPlanId = `${currentTier}${cycleSuffix}`;
 
-    const plan = availablePlans.find(p => p.type === targetPlanType);
+    const plan = availablePlans.find(p => p.type === finalPlanId);
     if (plan) {
       total += plan.price;
     } else {
-      const baseMonthlyType = (formData.base_plan_type === 'SERVICE_MONTHLY' || formData.base_plan_type.includes('SERVICE')) 
-        ? 'SERVICE_MONTHLY' 
-        : 'MONTHLY';
-      const basePlan = availablePlans.find(p => p.type === baseMonthlyType);
-      if (basePlan) total += (basePlan.price * multiplier * discount);
+      // Fallback: If ANNUAL plan not found in availablePlans, use monthly * multiplier
+      const baseMonthly = availablePlans.find(p => p.type === `${currentTier}_MONTHLY`);
+      if (baseMonthly) {
+          const multiplier = cycle === 'ANNUAL' ? 8 : cycle === 'QUARTERLY' ? 2.5 : 1;
+          total += (baseMonthly.price * multiplier);
+      }
     }
 
-    // 2. Modules
+    // 2. Modules (Modules also follow the same cycle discount)
+    const modMultiplier = cycle === 'ANNUAL' ? 12 : cycle === 'QUARTERLY' ? 3 : 1;
+    // 33% off for modules in annual (pay for 8 months)
+    let modDiscount = cycle === 'ANNUAL' ? 0.66 : 1; 
+    
     formData.selected_modules.forEach(modType => {
       const mod = availableModules.find(m => m.type === modType);
-      if (mod) total += (mod.price * multiplier * discount);
+      if (mod) total += (mod.price * modMultiplier * modDiscount);
     });
 
     return Math.round(total);
@@ -320,11 +311,17 @@ function RegisterForm() {
   };
 
   const calculateSavings = (cycle: 'QUARTERLY' | 'ANNUAL') => {
-    const monthlyTotal = calculateTotalForCycle('MONTHLY');
     const multiplier = cycle === 'ANNUAL' ? 12 : cycle === 'QUARTERLY' ? 3 : 1;
-    const original = monthlyTotal * multiplier;
-    const current = calculateTotalForCycle(cycle);
-    if (original === 0) return cycle === 'ANNUAL' ? 15 : 10;
+    
+    let currentTier = formData.base_plan_type.split('_')[0];
+    if (currentTier === 'TRIAL') currentTier = 'GROWTH';
+    
+    const monthlyRate = availablePlans.find(p => p.type === `${currentTier}_MONTHLY`)?.price || 0;
+    
+    const original = (monthlyRate * multiplier);
+    const current = calculateTotalForCycle(cycle); // Modules are included here
+    
+    if (original === 0) return 0;
     return Math.round(((original - current) / original) * 100);
   };
 
@@ -527,27 +524,27 @@ function RegisterForm() {
 
              {step === 3 && (
               <div className="space-y-6 animate-zoom-in">
-                <div className="flex flex-col md:flex-row gap-4 mb-4 p-1 bg-slate-100 rounded-2xl md:max-w-md mx-auto">
-                   <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, base_plan_type: 'TRIAL' })}
-                    className={cn(
-                      "flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all",
-                      formData.base_plan_type === 'TRIAL' ? "bg-white text-teal-600 shadow-sm" : "text-slate-500 hover:bg-slate-50"
-                    )}
-                   >
-                    Growing Business
-                   </button>
-                   <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, base_plan_type: 'SERVICE_MONTHLY', selected_modules: [] })}
-                    className={cn(
-                      "flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all",
-                      formData.base_plan_type === 'SERVICE_MONTHLY' ? "bg-white text-teal-600 shadow-sm" : "text-slate-500 hover:bg-slate-50"
-                    )}
-                   >
-                    Starter / Basic
-                   </button>
+                <div className="flex flex-col md:flex-row gap-4 mb-4 p-1 bg-slate-100 rounded-2xl mx-auto w-full">
+                   {[
+                     { id: 'ESSENTIAL_MONTHLY', label: 'Essential', icon: Store },
+                     { id: 'GROWTH_MONTHLY', label: 'Growth', icon: Zap },
+                     { id: 'SCALE_MONTHLY', label: 'Scale', icon: ShieldCheck }
+                   ].map((item) => (
+                     <button
+                       key={item.id}
+                       type="button"
+                       onClick={() => setFormData({ ...formData, base_plan_type: item.id })}
+                       className={cn(
+                         "flex-1 py-3 px-4 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2",
+                         formData.base_plan_type === item.id || (formData.base_plan_type === 'TRIAL' && item.id === 'GROWTH_MONTHLY')
+                           ? "bg-white text-teal-600 shadow-sm border border-slate-200" 
+                           : "text-slate-500 hover:bg-slate-50"
+                       )}
+                     >
+                       <item.icon size={14} />
+                       {item.label}
+                     </button>
+                   ))}
                 </div>
 
 
